@@ -6,4 +6,5 @@
 *.svg -text
 *.pdf binary
 *.png binary
+*.jpg binary
 *.docx binary
