@@ -1,0 +1,26 @@
+# Do not add personal/source materials or local runtime files.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.token
+*.log
+*.tmp
+~$*
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+__pycache__/
+node_modules/
+.venv/
+venv/
+tmp/
+draft/
+private/
+recordings/
+course-materials/
+AGENTS.md
