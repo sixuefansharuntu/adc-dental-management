@@ -9,6 +9,8 @@ test('日期须成对、合法、含端1—366天，支持全期清空',()=>{
  for(const q of[{fromDate:'2026-01-01'},{fromDate:'2026-02-30',toDate:'2026-03-01'},
   {fromDate:'2026-02-01',toDate:'2026-01-01'},{fromDate:'2026-01-01',toDate:'2027-01-02'}])assert.throws(()=>patientAppointmentsQuery(q));
  assert.equal(patientAppointmentsQuery({fromDate:'',toDate:''}).fromDate,null);
+ assert.throws(()=>patientAppointmentsQuery({fromDate:'2026-02-01',toDate:'2026-01-01'}),/开始日期不能晚于结束日期/);
+ assert.throws(()=>patientAppointmentsQuery({fromDate:'2026-01-01',toDate:'2027-01-02'}),/最多为366天/);
 });
 test('拒绝伪造多值筛选与超量页数，续页参数有界',()=>{
  for(const q of[{clinicId:'bad'},{state:'closed'},{state:['active','cancelled']},{limit:'0'},

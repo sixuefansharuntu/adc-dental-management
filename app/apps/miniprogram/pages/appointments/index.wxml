@@ -5,11 +5,13 @@
   <view wx:if="{{!enabled}}" class="notice">当前仅开放排班查询。</view>
   <view wx:elif="{{!patient}}" class="profile">
     <view class="section-title">患者登录</view>
-    <label class="form-label" for="mine-name">演示账号</label>
+    <label class="form-label" for="mine-name">患者账号</label>
     <input id="mine-name" class="entry" value="{{loginName}}" data-field="loginName" bindinput="input" disabled="{{busy}}"/>
     <label class="form-label" for="mine-password">密码</label>
     <input id="mine-password" class="entry" password="{{true}}" value="{{password}}" data-field="password" bindinput="input" disabled="{{busy}}"/>
+    <view wx:if="{{error}}" class="error" aria-live="polite">{{error}}</view>
     <view class="action-stack"><button class="primary" bindtap="login" disabled="{{busy}}" loading="{{busy}}">登录</button></view>
+    <navigator wx:if="{{!busy}}" class="text-button account-link" url="/pages/account/index?mode=register">新用户？注册患者账号</navigator>
   </view>
   <block wx:else>
     <view wx:if="{{otherPending}}" class="notice">
@@ -41,16 +43,36 @@
     </view>
 
     <view class="list-heading">
-      <view class="appointment-tabs">
-        <button class="{{view === 'upcoming' ? 'current' : ''}}" data-view="upcoming" bindtap="changeView" disabled="{{busy || !!selected}}">即将就诊</button>
-        <button class="{{view === 'history' ? 'current' : ''}}" data-view="history" bindtap="changeView" disabled="{{busy || !!selected}}">历史记录</button>
+      <view class="section-title">预约记录</view>
+      <button class="text-button" bindtap="logout" disabled="{{busy}}">退出登录</button>
+    </view>
+    <navigator wx:if="{{!busy}}" class="text-button account-link" url="/pages/account/index?mode=password">修改密码</navigator>
+    <view class="profile">
+      <view class="filter-grid">
+        <picker mode="date" value="{{fromDate}}" data-field="fromDate" bindchange="changeFilter" disabled="{{busy || !!selected}}"><view class="form-label">预约开始日期</view><view class="entry">{{fromDate || '请选择'}}</view></picker>
+        <picker mode="date" value="{{toDate}}" data-field="toDate" bindchange="changeFilter" disabled="{{busy || !!selected}}"><view class="form-label">预约结束日期</view><view class="entry">{{toDate || '请选择'}}</view></picker>
+        <picker range="{{clinics}}" range-key="name" value="{{clinicIndex}}" data-field="clinicIndex" bindchange="changeFilter" disabled="{{busy || !!selected}}"><view class="form-label">预约诊所</view><view class="entry">{{clinics[clinicIndex].name}}</view></picker>
+        <picker range="{{states}}" range-key="label" value="{{stateIndex}}" data-field="stateIndex" bindchange="changeFilter" disabled="{{busy || !!selected}}"><view class="form-label">预约状态</view><view class="entry">{{states[stateIndex].label}}</view></picker>
+        <picker range="{{limits}}" value="{{limitIndex}}" data-field="limitIndex" bindchange="changeFilter" disabled="{{busy || !!selected}}"><view class="form-label">每页预约</view><view class="entry">{{limits[limitIndex]}}</view></picker>
       </view>
-      <button class="text-button" bindtap="refresh" disabled="{{busy || !!selected}}">刷新</button>
+      <view class="action-stack filter-actions">
+        <button class="primary" bindtap="refresh" disabled="{{busy || !!selected}}">查询预约</button>
+        <button class="secondary" bindtap="clearFilters" disabled="{{busy || !!selected}}">清空筛选</button>
+      </view>
+      <view class="caption">日期按预约开始日计算，两项留空可查全期。</view>
+      <view wx:if="{{asOf}}" class="caption">已显示 {{rows.length}} / {{total}} 份 · 北京时间 {{asOf}}</view>
+    </view>
+    <view wx:if="{{summary}}" class="profile overview">
+      <view><text>{{summary.total}}</text><view class="caption">范围内全部预约</view></view>
+      <view><text>{{summary.upcoming}}</text><view class="caption">未来待就诊</view></view>
+      <view><text>{{summary.active}}</text><view class="caption">有效预约</view></view>
+      <view><text>{{summary.cancelled}}</text><view class="caption">已取消</view></view>
     </view>
     <view wx:if="{{busy && !rows.length}}" class="notice">正在加载预约…</view>
+    <view wx:elif="{{dirty && !error}}" class="notice">筛选条件已改变，请查询后查看新结果。</view>
     <view wx:elif="{{!rows.length && !error}}" class="notice">
-      <view>{{view === 'upcoming' ? '暂无即将就诊的预约。' : '暂无历史预约。'}}</view>
-      <navigator wx:if="{{view === 'upcoming'}}" class="text-button" url="/pages/index/index" open-type="switchTab">去预约</navigator>
+      <view>所选范围内暂无预约。</view>
+      <navigator class="text-button" url="/pages/index/index" open-type="switchTab">去预约</navigator>
     </view>
     <view wx:for="{{rows}}" wx:key="id" class="profile appointment">
       <view class="appointment-heading"><text class="appointment-day">{{item.dayLabel}}</text><text class="appointment-status {{item.disposition !== 'active' ? 'past' : ''}}">{{item.statusLabel}}</text></view>
@@ -75,6 +97,6 @@
     </view>
     <button wx:if="{{cursor}}" class="secondary more" bindtap="more" disabled="{{busy}}">加载更多</button>
   </block>
-  <view wx:if="{{error}}" class="error" aria-live="polite">{{error}}</view>
+  <view wx:if="{{patient && error}}" class="error" aria-live="polite">{{error}}</view>
   <navigator wx:if="{{enabled}}" class="text-button recovery-link" url="/pages/recovery/index">核实提交结果</navigator>
 </view>

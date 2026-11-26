@@ -6,6 +6,9 @@ export const courseLoginRoles = [
   { id: 'patient', kind: 'patient', label: '演示患者', loginName: 'alice' },
   { id: 'frontdesk', kind: 'staff', label: '东城前台', loginName: 'front.east', accountId: 'f2407184-ee5c-410e-aa77-c1fea2be3cce', employeeId: '73d094ae-360b-4412-af46-96a8f2b5a83e' },
   { id: 'doctor', kind: 'staff', label: '东城医生', loginName: 'doctor.lin', accountId: '31c26e49-5d18-4a4d-a98c-fd0cfd803e81', employeeId: 'c508dbd0-f62e-41c9-a44c-27bdf63659c5' },
+  { id: 'finance', kind: 'staff', label: '财务', loginName: 'finance.hq', accountId: '8f110ea2-9928-47e9-a60b-1f0027b2e4ee', employeeId: '9609d876-741f-48f0-a2a3-c15b67f92799' },
+  { id: 'clinic-manager', kind: 'staff', label: '东城诊所管理', loginName: 'manager.east', accountId: 'b395c285-613e-4270-a0fb-8036c7a9a94e', employeeId: 'b08c4db7-4011-41d6-a523-5733fbae940b' },
+  { id: 'hq-review', kind: 'staff', label: '总部复核', loginName: 'review.hq', accountId: 'ae837e12-ac66-4153-a090-524b37220944', employeeId: 'bc4515f5-a1e0-4d94-a5b7-0374f22fed38' },
 ] as const;
 
 const cookie = 'adc_course_review';

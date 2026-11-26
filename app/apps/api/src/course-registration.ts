@@ -19,9 +19,9 @@ export function registrationInput(value:unknown){
 export class CoursePatientRegistration {
  private throttle=new LoginThrottle(Date.now,512,2);
  constructor(private pool:any,private gate:CourseDemoGate){}
- async register(req:Request,res:Response,value:unknown){
+ async register(req:Request,res:Response,value:unknown,caller=canonicalIp(req.ip||req.socket?.remoteAddress||'')){
   if(!this.gate.registrationEnabled||!this.gate.manifest)throw new ForbiddenException('当前环境未开放患者自助注册。');
-  const input=registrationInput(value),ticket=this.throttle.acquire(canonicalIp(req.ip||req.socket?.remoteAddress||''));
+  const input=registrationInput(value),ticket=this.throttle.acquire(caller);
   if(!ticket.allowed){res.setHeader('Retry-After',String(ticket.retryAfter));throw new HttpException('注册尝试过多，请稍后再试。',HttpStatus.TOO_MANY_REQUESTS);}
   let c:any;
   try{

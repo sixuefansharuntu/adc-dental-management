@@ -1,3 +1,10 @@
+const states = [
+ { value: 'all', label: '全部预约' }, { value: 'upcoming', label: '未来待就诊' },
+ { value: 'active', label: '有效预约' }, { value: 'arrived', label: '已到院' },
+ { value: 'cancelled', label: '已取消' }, { value: 'no_show', label: '未到结案' },
+];
+const limits = [10, 20, 50];
+const allClinics = { id: '', name: '全部本人预约诊所' };
 function createAppointmentsPage({api,state,enabled,newRequestId,navigate,revealCancel=()=>{}}) {
  const display = rows => rows.map(r=>{
   if(!r||typeof r.id!=='string'||!Number.isInteger(r.version)||typeof r.canCancel!=='boolean'||typeof r.canReschedule!=='boolean'||!Number.isFinite(Date.parse(r.startsAt))||!Number.isFinite(Date.parse(r.endsAt)))throw Error('预约资料不完整，请重新查询。');
@@ -11,26 +18,55 @@ function createAppointmentsPage({api,state,enabled,newRequestId,navigate,revealC
    statusLabel:({active:'已确认',cancelled:'已取消',arrived:'已到院',no_show:'未到结案'})[r.disposition]||'请核实'};
  });
  return {
-  data:{enabled:false,patient:null,loginName:'',password:'',rows:[],view:'upcoming',detailId:'',cursor:null,busy:false,error:'',selected:null,reason:'',confirmed:false,otherPending:false,unknown:false,retryAllowed:false,retryConfirmed:false},
+  data:{enabled:false,patient:null,loginName:'',password:'',rows:[],detailId:'',cursor:null,busy:false,error:'',selected:null,reason:'',confirmed:false,otherPending:false,unknown:false,retryAllowed:false,retryConfirmed:false,
+   states, limits, clinics:[allClinics], stateIndex:0, clinicIndex:0, limitIndex:1, fromDate:'', toDate:'', summary:null, total:0, asOf:'', dirty:false},
   onLoad(){this._alive=true;this._visible=true;this._epoch=0;this.setData({enabled:enabled()});if(this.data.enabled)return this.restore();},
-  onHide(){this._visible=false;this._epoch++;this.setData({rows:[],cursor:null,detailId:'',password:'',busy:false,selected:null,confirmed:false});},
+  onHide(){this._visible=false;this._epoch++;this.setData({rows:[],cursor:null,detailId:'',password:'',busy:false,selected:null,confirmed:false,summary:null,total:0,asOf:''});},
   onUnload(){this._alive=false;this._visible=false;this._epoch++;},
   onShow(){if(!this._visible&&this._alive){this._visible=true;return this.restore();}},
   current(t){return this._alive&&this._visible&&t===this._epoch;},
-  input(e){if(this.data.busy)return;const k=e.currentTarget.dataset.field;if(['loginName','password','reason'].includes(k)&&typeof e.detail.value==='string')this.setData({[k]:e.detail.value,confirmed:false});},
+  input(e){if(this.data.busy)return;const k=e.currentTarget.dataset.field;if(['loginName','password','reason'].includes(k)&&typeof e.detail.value==='string')this.setData({[k]:e.detail.value,confirmed:false,error:''});},
   async login(){if(this.data.busy||!this.data.enabled||!this._visible)return;const t=++this._epoch,b={loginName:this.data.loginName,password:this.data.password};this.setData({busy:true,password:'',error:'',rows:[],patient:null});try{const p=await api.login(b);if(this.current(t)){this.adopt(p);await this.load(false,t);}}catch(e){if(this.current(t))this.setData({error:e.message});}finally{if(this.current(t))this.setData({busy:false});}},
-  adopt(p){if(state.pending&&state.pending.phase!=='saved'&&state.pending.subjectId!==p.subjectId){api.forget();throw Error('请用原患者核实未完成请求。');}this.setData({patient:p,otherPending:!!state.pending&&state.pending.kind!=='cancel'&&state.pending.phase!=='saved',unknown:!!state.pending&&state.pending.kind==='cancel'&&state.pending.phase!=='saved'});},
-  async restore(){const t=++this._epoch;this.setData({busy:true,error:'',rows:[],patient:null});try{const p=await api.session();if(this.current(t)){this.adopt(p);await this.load(false,t);}}catch(e){if(this.current(t))this.setData({error:e.message,patient:null});}finally{if(this.current(t))this.setData({busy:false});}},
-  async load(append,t){const r=await api.mine(append?this.data.cursor:null,this.data.view);if(!this.current(t))return;if(!r||!Array.isArray(r.items)||(r.nextCursor!==null&&typeof r.nextCursor!=='string'))throw Error('预约列表不完整，请重新查询。');const rows=display(r.items);this.setData({rows:append?this.data.rows.concat(rows):rows,cursor:r.nextCursor});},
-  changeView(e){
-   const view=e.currentTarget.dataset.view;
-   if(!this._visible||!this.data.patient||this.data.busy||this.data.selected||!['upcoming','history'].includes(view)||view===this.data.view)return;
-   this.setData({view,detailId:''});
+  adopt(p){if(state.pending&&state.pending.phase!=='saved'&&state.pending.subjectId!==p.subjectId){api.forget();throw Error('请用原患者核实未完成请求。');}if(this._subject!==p.subjectId){this._subject=p.subjectId;this.setData({clinics:[allClinics],stateIndex:0,clinicIndex:0,limitIndex:1,fromDate:'',toDate:'',summary:null,total:0,asOf:'',dirty:false});}this.setData({patient:p,otherPending:!!state.pending&&state.pending.kind!=='cancel'&&state.pending.phase!=='saved',unknown:!!state.pending&&state.pending.kind==='cancel'&&state.pending.phase!=='saved'});},
+  async restore(){const t=++this._epoch;this.setData({busy:true,error:'',rows:[],patient:null});try{const p=await api.session();if(this.current(t)){this.adopt(p);await this.load(false,t);}}catch(e){if(this.current(t))this.setData({error:e.code==='NO_SESSION'?'':e.message,patient:null});}finally{if(this.current(t))this.setData({busy:false});}},
+  async logout(){
+   if(!this.data.patient||this.data.busy||!this._visible)return;
+   const t=++this._epoch;
+   this.setData({busy:true,error:''});
+   try{await api.logout();}catch(e){if(this.current(t))this.setData({error:e.message});}
+   finally{if(this.current(t))this.setData({busy:false,patient:null,rows:[],cursor:null,detailId:'',selected:null,reason:'',confirmed:false,summary:null,total:0,asOf:''});}
+  },
+  async load(append,t){
+   const {fromDate,toDate,clinicIndex,stateIndex,limitIndex,clinics} = this.data;
+   if (!!fromDate !== !!toDate) throw Error('请同时填写预约开始和结束日期，或将两项都留空。');
+   if (fromDate && toDate < fromDate) throw Error('预约开始日期不能晚于结束日期。');
+   const clinicId=clinics[clinicIndex].id;
+   const filters={state:states[stateIndex].value,limit:String(limits[limitIndex]),
+    ...(fromDate?{fromDate,toDate}:{}),...(clinicId?{clinicId}:{})};
+   const r=await api.mine(append?this.data.cursor:null,filters);
+   if(!this.current(t))return;
+   if(!r||!Array.isArray(r.items)||(r.nextCursor!==null&&typeof r.nextCursor!=='string'))throw Error('预约列表不完整，请重新查询。');
+   const rows=display(r.items), directory=Array.isArray(r.clinics)?[allClinics,...r.clinics]:clinics;
+   this.setData({rows:append?this.data.rows.concat(rows):rows,cursor:r.nextCursor,clinics:directory,
+    clinicIndex:Math.max(0,directory.findIndex(item=>item.id===clinicId)),summary:r.summary||null,total:r.total??rows.length,
+    asOf:r.asOf&&Number.isFinite(Date.parse(r.asOf))?new Date(Date.parse(r.asOf)+28800000).toISOString().slice(0,16).replace('T',' '):'',dirty:false});
+  },
+  changeFilter(e){
+   if(!this._visible||!this.data.patient||this.data.busy||this.data.selected)return;
+   const field=e.currentTarget.dataset.field,raw=e.detail.value;
+   const sizes={stateIndex:states.length,clinicIndex:this.data.clinics.length,limitIndex:limits.length};
+   const value=field==='fromDate'||field==='toDate'?raw:Number(raw);
+   if(typeof value==='string'? !/^\d{4}-\d{2}-\d{2}$/.test(value) : !Number.isInteger(value)||value<0||!(value<sizes[field]))return;
+   this.setData({[field]:value,dirty:true,rows:[],cursor:null,summary:null,total:0,asOf:'',detailId:'',error:''});
+  },
+  clearFilters(){
+   if(this.data.busy||!this.data.patient||!this._visible||this.data.selected)return;
+   this.setData({stateIndex:0,clinicIndex:0,fromDate:'',toDate:''});
    return this.refresh();
   },
   toggleDetail(e){const row=this.row(e);if(row&&!this.data.busy)this.setData({detailId:this.data.detailId===row.id?'':row.id});},
-  async refresh(){if(this.data.busy||!this.data.patient||!this._visible)return;const t=++this._epoch;this.setData({busy:true,error:'',rows:[],cursor:null,selected:null});try{await this.load(false,t);}catch(e){if(this.current(t))this.setData({error:e.message,...(e.status===401?{patient:null}: {})});}finally{if(this.current(t))this.setData({busy:false});}},
-  async more(){if(this.data.busy||!this.data.cursor||!this._visible)return;const t=++this._epoch;this.setData({busy:true,error:''});try{await this.load(true,t);}catch(e){if(this.current(t))this.setData({error:e.message,rows:[],cursor:null,...(e.status===401?{patient:null}: {})});}finally{if(this.current(t))this.setData({busy:false});}},
+  async refresh(){if(this.data.busy||!this.data.patient||!this._visible)return;const t=++this._epoch;this.setData({busy:true,error:'',rows:[],cursor:null,selected:null,summary:null,total:0,asOf:''});try{await this.load(false,t);}catch(e){if(this.current(t))this.setData({error:e.message,...(e.status===401?{patient:null}: {})});}finally{if(this.current(t))this.setData({busy:false});}},
+  async more(){if(this.data.busy||!this.data.cursor||!this._visible)return;const t=++this._epoch;this.setData({busy:true,error:''});try{await this.load(true,t);}catch(e){if(this.current(t))this.setData({error:e.message,rows:[],cursor:null,summary:null,total:0,asOf:'',...(e.status===401?{patient:null}: {})});}finally{if(this.current(t))this.setData({busy:false});}},
   row(e){return this.data.rows.find(r=>r.id===e.currentTarget.dataset.id);},
   blocked(){return this.data.busy||!this.data.patient||!this._visible||state.pending&&state.pending.phase!=='saved';},
   chooseCancel(e){if(this.blocked())return;const r=this.row(e);if(r&&r.canCancel)this.setData({selected:{id:r.id,version:r.version,range:r.range,doctorName:r.doctorName,clinicName:r.clinicName,serviceName:r.serviceName},reason:'',confirmed:false,error:''},revealCancel);},

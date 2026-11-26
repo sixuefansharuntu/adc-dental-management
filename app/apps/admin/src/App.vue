@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { loginFailure } from './login-feedback';
 import { CalendarDays, ChevronLeft, ChevronRight, RefreshCw, Users, Package, Wallet, Settings, ArrowUpRight, Clock3, Check, X, LockKeyhole, Database, LogOut, Stethoscope, CircleHelp, Smartphone, LayoutDashboard } from '@lucide/vue';
 
 interface Doctor { id: string; clinicName: string; publicName: string; specialty: string; serviceName: string; durationMinutes: number }
@@ -61,9 +62,11 @@ function pickDate(value: string) { selectedDate.value = value; notice.value = ''
 function moveDate(amount: number) { const date = new Date(`${selectedDate.value}T00:00:00Z`); date.setUTCDate(date.getUTCDate()+amount); pickDate(date.toISOString().slice(0,10)); }
 async function openLogin() { loginOpen.value = true; loginError.value = ''; password.value = ''; await nextTick(); passwordField.value?.focus(); }
 async function login() {
+  if (loggingIn.value) return;
+  if (!password.value) { loginError.value = '请输入开发密码。'; return; }
   loggingIn.value = true; loginError.value = '';
   try { await api('/admin/session', { method:'POST', body: JSON.stringify({ password: password.value }) }); loggedIn.value = true; loginOpen.value = false; password.value=''; await refresh(); notice.value='本机技术账号已登录，可以维护示例排班。'; }
-  catch(e) { loginError.value = e instanceof Error ? e.message : '登录失败'; }
+  catch(e) { loginError.value = e instanceof ApiError && e.status === 401 ? '开发密码不正确，请核对本机启动说明。' : loginFailure(e); }
   finally { loggingIn.value = false; }
 }
 async function logout() { try { await api('/admin/logout',{method:'POST',body:'{}'}); loggedIn.value=false; uncertain.value=null; await refresh(); } catch(e) { error.value=String(e); } }
@@ -149,6 +152,6 @@ onUnmounted(() => window.removeEventListener('keydown',escapeDialog));
 
     <main v-else class="standalone-patient"><a href="/" class="back-link"><ChevronLeft :size="16"/>回到工作台</a><section class="patient-preview"><div class="patient-hero"><span class="patient-brand"><Stethoscope :size="19"/> ADC 牙科</span><h3>为您的笑容<br>安排一个好时间。</h3><span>公开排班查询 · 技术验证</span><div class="hero-orbit orbit-one"></div></div><div class="patient-content"><p class="standalone-notice">当前为示例数据预览，尚不受理预约。</p><label class="patient-selector">诊所<select v-model="selectedClinic" @change="setClinic"><option v-for="clinic in clinics" :key="clinic">{{clinic}}</option></select></label><label class="patient-selector">医生<select v-model="patientDoctor"><option v-for="doctor in clinicDoctors" :key="doctor.id" :value="doctor.id">{{doctor.publicName}} · {{doctor.specialty}}</option></select></label><label class="patient-selector">就诊日期<input type="date" v-model="selectedDate" @change="refresh"/></label><div v-if="error" class="alert error">{{error}}<button @click="refresh">重试</button></div><div v-if="loading" class="preview-empty">正在查询…</div><div v-else class="slot-grid"><button v-for="slot in patientSlots" :key="slot.startsAt" class="slot" :class="slot.status" disabled><span>{{timeLabel(slot.startsAt)}}</span><small>{{slot.status==='available'?'开放展示':'暂不可约'}}</small></button></div><p v-if="!loading&&!patientSlots.length" class="patient-note">当前没有公开时段，请调整日期或医生。</p><button class="patient-submit" disabled>预约功能开发中</button><span class="patient-disclaimer">技术验证 · 非真实诊疗服务</span></div></section></main>
 
-    <div v-if="loginOpen" class="modal-backdrop" @click.self="!loggingIn&&(loginOpen=false)"><section class="login-dialog" role="dialog" aria-modal="true" aria-labelledby="login-title"><button class="dialog-close icon-button" @click="loginOpen=false" :disabled="loggingIn" aria-label="关闭登录"><X :size="20"/></button><span class="login-icon"><LockKeyhole :size="25"/></span><h2 id="login-title">登录本机技术账号</h2><p>此账号仅维护本地合成排班，不代表正式员工账号或微信身份。</p><form @submit.prevent="login"><label>开发密码<input ref="passwordField" v-model="password" type="password" autocomplete="current-password" required placeholder="输入本机启动说明中的密码"/></label><p class="password-help">密码位于 app/.runtime/启动信息.txt</p><div v-if="loginError" class="alert error" role="alert">{{loginError}}</div><button class="primary-button" :disabled="loggingIn">{{loggingIn?'正在验证…':'登录并维护排班'}}<ArrowUpRight :size="16"/></button></form></section></div>
+    <div v-if="loginOpen" class="modal-backdrop" @click.self="!loggingIn&&(loginOpen=false)"><section class="login-dialog" role="dialog" aria-modal="true" aria-labelledby="login-title"><button class="dialog-close icon-button" @click="loginOpen=false" :disabled="loggingIn" aria-label="关闭登录"><X :size="20"/></button><span class="login-icon"><LockKeyhole :size="25"/></span><h2 id="login-title">登录本机技术账号</h2><p>此账号仅维护本地合成排班，不代表正式员工账号或微信身份。</p><form novalidate @submit.prevent="login"><label>开发密码<input ref="passwordField" v-model="password" type="password" autocomplete="current-password" required placeholder="输入本机启动说明中的密码" @input="loginError=''"/></label><p class="password-help">密码位于 app/.runtime/启动信息.txt</p><div v-if="loginError" class="alert error" role="alert">{{loginError}}</div><button class="primary-button" :disabled="loggingIn">{{loggingIn?'正在验证…':'登录并维护排班'}}<ArrowUpRight :size="16"/></button></form></section></div>
   </div>
 </template>

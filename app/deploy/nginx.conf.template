@@ -4,6 +4,10 @@ map "$request_method:$uri" $adc_login_key {
     ~*^POST:/api/v1/((staff|patient)/session|patient/(register|password)|demo/(access|session))/?$ $binary_remote_addr;
 }
 limit_req_zone $adc_login_key zone=adc_login:10m rate=10r/m;
+map $uri $adc_asset_cache {
+    default "";
+    "~^/assets/[^/]+-[A-Za-z0-9_-]{8}\.[A-Za-z0-9]+$" "public, max-age=31536000, immutable";
+}
 server {
     listen 80;
     server_name ${PUBLIC_HOST};
@@ -21,6 +25,12 @@ server {
     root /usr/share/nginx/html;
     index index.html;
     client_max_body_size 12m;
+    add_header_inherit merge;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    add_header Content-Security-Policy "frame-ancestors 'none'; object-src 'none'; base-uri 'self'" always;
     location ^~ /api/v1/ {
         limit_req zone=adc_login burst=8 nodelay;
         limit_req_status 429;
@@ -35,6 +45,8 @@ server {
         proxy_set_header X-Forwarded-Port "";
         proxy_next_upstream off;
         proxy_read_timeout 30s;
+        proxy_hide_header X-Content-Type-Options;
+        proxy_hide_header Cache-Control;
         add_header Cache-Control "no-store" always;
     }
     location @adc_login_limited {
@@ -47,5 +59,22 @@ server {
     location /api/ { return 404; }
     location ~ (^|/)\. { return 404; }
     location ~* \.(map|pem|key|env)$ { return 404; }
-    location / { try_files $uri $uri/ /index.html; }
+    # The HTML selects the current fingerprinted assets after each deployment.
+    location = /index.html {
+        add_header Cache-Control "no-store" always;
+        etag off;
+        if_modified_since off;
+    }
+    location ~ ^/(|patient/?)$ { rewrite ^ /index.html last; }
+    location /assets/ {
+        try_files $uri =404;
+        gzip on;
+        gzip_vary on;
+        gzip_types application/javascript text/javascript text/css image/svg+xml;
+        add_header Cache-Control $adc_asset_cache;
+        location ~ ^/assets/[A-Za-z0-9][A-Za-z0-9._-]*\.mjs$ {
+            types { application/javascript mjs; }
+        }
+    }
+    location / { try_files $uri =404; }
 }

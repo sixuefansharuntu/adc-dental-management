@@ -1,11 +1,13 @@
 import{Injectable,Inject,ForbiddenException,UnauthorizedException,BadRequestException,HttpException,HttpStatus,ServiceUnavailableException}from'@nestjs/common';
 import{createHash,createHmac,randomBytes,timingSafeEqual}from'node:crypto';
-import type{Request}from'express';
+import type{Request,Response}from'express';
 import{DatabaseService}from'./database.service';
 import{objectInput,textInput}from'./booking-domain';
 import{credentialMatches}from'./credentials';
 import{CourseDemoGate}from'./course-demo';
 import{LoginThrottle}from'./login-throttle';
+import{CoursePatientRegistration}from'./course-registration';
+import{PatientPasswordChange}from'./patient-password';
 import type{PatientActor}from'./auth.service';
 
 /**
@@ -22,6 +24,8 @@ import type{PatientActor}from'./auth.service';
 @Injectable()
 export class MpPublicAuth{
  private demo:CourseDemoGate;
+ private registration:CoursePatientRegistration;
+ private passwords:PatientPasswordChange;
  private loginThrottle=new LoginThrottle(Date.now,4096,24);
  private userWindow=new Map<string,{count:number;until:number}>();
  private globalWindow={count:0,until:0};
@@ -32,6 +36,8 @@ export class MpPublicAuth{
 
  constructor(@Inject(DatabaseService)private db:DatabaseService){
   this.demo=new CourseDemoGate(db.pool);
+  this.registration=new CoursePatientRegistration(db.pool,this.demo);
+  this.passwords=new PatientPasswordChange(db.pool,this.demo);
  }
 
  private digest(token:string){return createHash('sha256').update(token).digest('hex');}
@@ -78,10 +84,11 @@ export class MpPublicAuth{
  }
 
  async login(req:Request,value:unknown){
-  const openid=this.source(req),release=this.budget(openid);
+  const openid=this.source(req);
   const b=objectInput(value,['loginName','password']);
   const login=textInput(b.loginName,'登录名',100).toLowerCase();
-  if(typeof b.password!=='string'||!b.password.length||b.password.length>200||/[\u0000-\u001f]/.test(b.password)){release();throw new BadRequestException('请填写有效的密码。');}
+  if(typeof b.password!=='string'||!b.password.length||b.password.length>200||/[\u0000-\u001f]/.test(b.password))throw new BadRequestException('请填写有效的密码。');
+  const release=this.budget(openid);
   // 按账号限流：换账号不能绕过；按 openid 的配额在 budget() 里已生效
   const ticket=this.loginThrottle.acquire('mp-login:'+login);
   if(!ticket.allowed){release();throw new HttpException('尝试过多，请稍后再试。',HttpStatus.TOO_MANY_REQUESTS);}
@@ -103,13 +110,35 @@ export class MpPublicAuth{
   }finally{ticket.finish(failed);release();}
  }
 
+ async register(req:Request,res:Response,value:unknown){
+  const openid=this.source(req),release=this.budget(openid);
+  try{
+   return await this.registration.register(req,res,value,openid);
+  }finally{release();}
+ }
+
+ private bearer(req:Request){
+  const header=req.headers.authorization;
+  if(typeof header!=='string'||!/^Bearer mp_[a-f0-9]{64}$/.test(header))throw new UnauthorizedException('请先完成本人验证。');
+  return header.slice(7);
+ }
+
+ async changePassword(req:Request,res:Response,value:unknown){
+  const openid=this.source(req),release=this.budget(openid);
+  try{
+   const token=this.bearer(req);
+   await this.demo.assertEnvironment();
+   const actor=await this.patientByToken(token);
+   return await this.passwords.change(req,res,value,actor,token,openid);
+  }finally{release();}
+ }
+
  async patient(req:Request):Promise<PatientActor>{
   const openid=this.source(req),release=this.budget(openid);
   try{
-   const h=req.headers.authorization;
-   if(typeof h!=='string'||!/^Bearer mp_[a-f0-9]{64}$/.test(h))throw new UnauthorizedException('请先完成本人验证。');
+   const token=this.bearer(req);
    await this.demo.assertEnvironment();
-   return await this.patientByToken(h.slice(7));
+   return await this.patientByToken(token);
   }finally{release();}
  }
 

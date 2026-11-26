@@ -31,6 +31,7 @@ button::after { border: 0; }
 .danger { background: #fbece6; color: #853b26; }
 .primary[disabled], .secondary[disabled], .danger[disabled], .text-button[disabled] { background: #edf0ef; color: #5c6c6a; }
 .action-stack { display: flex; flex-direction: column; gap: 14rpx; margin-top: 24rpx; }
+.account-link { margin-top: 14rpx; }
 .error .secondary { margin-top: 16rpx; }
 .form-label { display: block; margin: 18rpx 0 8rpx; color: #35595b; font-size: 27rpx; }
 .entry { box-sizing: border-box; display: block; width: 100%; min-height: 88rpx; padding: 16rpx 18rpx; border: 1rpx solid #d9e5e4; border-radius: 14rpx; background: #f8faf9; font-size: 30rpx; }

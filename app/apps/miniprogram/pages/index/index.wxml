@@ -1,7 +1,7 @@
 <view class="container home {{selectedSlot ? 'with-dock' : ''}}">
   <view class="home-nav">
     <text class="brand">ADC 牙科</text>
-    <button wx:if="{{bookingEnabled}}" class="text-button" bindtap="onMine">我的预约</button>
+    <button wx:if="{{bookingEnabled}}" class="text-button" bindtap="onMine">患者账号</button>
   </view>
 
   <view wx:if="{{!changing}}" class="welcome">
@@ -24,7 +24,7 @@
         <view class="choice-text"><text class="caption">诊所</text><text>{{clinicNames[clinicIndex] || '暂无诊所'}}  ›</text></view>
       </picker>
       <view wx:if="{{selected.address}}" class="address">{{selected.address}}</view>
-      <view class="doctor-field">
+      <view id="booking-doctors" class="doctor-field">
         <view class="caption">医生</view>
         <view wx:if="{{doctors.length}}" class="doctor-grid">
           <button wx:for="{{doctors}}" wx:key="doctorId" class="doctor-option {{doctorIndex === index ? 'chosen' : ''}}" data-id="{{item.doctorId}}" bindtap="onDoctorChoice" aria-label="{{item.doctorName}} {{item.specialty}} {{doctorIndex === index ? '已选择' : ''}}">
@@ -66,9 +66,15 @@
     </view>
     <view wx:elif="{{ready && !selected}}" class="notice">暂未发布可查询的医生和服务。</view>
     <view wx:elif="{{ready}}" class="schedule-results">
-      <view wx:if="{{slots.length}}" class="availability">{{availableCount}} 个可约时段</view>
-      <view wx:if="{{!slots.length}}" class="notice">当天暂无安排，可更换日期或医生。</view>
-      <view wx:elif="{{!availableCount}}" class="notice">当天暂无可约时段，可查看不可约原因或选择其他日期。</view>
+      <view class="availability">{{availableCount}} 个可约时段</view>
+      <view wx:if="{{!availableCount}}" class="notice schedule-empty">
+        <view class="section-title">{{slots.length ? '当天没有可预约的时段' : '当天暂无公开时段'}}</view>
+        <view aria-live="polite">{{nextUnavailable || nextError || '请选择其他日期或医生。'}}</view>
+        <view class="empty-actions">
+          <button wx:if="{{!nextUnavailable}}" class="primary" bindtap="onFindNext" loading="{{findingNext}}" disabled="{{findingNext}}">{{findingNext ? '正在查找…' : '找最近可约日期'}}</button>
+          <button wx:if="{{doctors.length > 1}}" class="secondary" bindtap="onFocusDoctors">换医生</button>
+        </view>
+      </view>
       <view wx:for="{{groups}}" wx:for-item="group" wx:key="name" class="time-group">
         <view class="period">{{group.name}}</view>
         <view class="time-grid">

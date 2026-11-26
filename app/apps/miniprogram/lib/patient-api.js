@@ -1,14 +1,17 @@
+const { loginFailure } = require('./access-feedback');
+
 function createPatientApi(platform, baseUrl, options = {}) {
   let token = '', epoch = 0, subjectId = '';
   const journal = options.journal;
   const originalBase = baseUrl();
   const uuid = v => typeof v==='string' && /^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(v);
-  function call(path, method, data, anonymous) {
+  function call(path, method, data, anonymous, accountOperation = false) {
     const owner = epoch, credential = token;
+    const isLogin = path === '/local-session';
     return new Promise((resolve, reject) => {
-      const fail = (message, status, definite) => { const e = new Error(message); e.status = status || 0; e.definite = !!definite; reject(e); };
+      const fail = (message, status, definite, code) => { const e = new Error(message); e.status = status || 0; e.definite = !!definite; e.code = code; reject(e); };
       if(baseUrl()!==originalBase){fail('后端地址已变化，请重新打开页面验证。');return;}
-      if (!anonymous && !credential) { fail('请先完成合成患者验证。', 401, true); return; }
+      if (!anonymous && !credential) { fail('请先登录患者账号。', 401, true, 'NO_SESSION'); return; }
       try {
         platform.request({
           url: originalBase.replace(/\/$/, '') + '/miniprogram' + path,
@@ -18,14 +21,18 @@ function createPatientApi(platform, baseUrl, options = {}) {
             if (owner !== epoch || baseUrl()!==originalBase) { fail('验证身份或后端地址已变化，请重新核对。'); return; }
             if (res.statusCode >= 200 && res.statusCode < 300) resolve(res.data);
             else {
-              if (res.statusCode === 401 && !anonymous) token = '';
-              const message = res.statusCode === 409 ? '时段或预约安排已变化，请重新查询。' : res.statusCode === 401 ? '合成患者验证已失效或密码不正确。' : res.statusCode === 403 ? '本机合成预约入口未开放。' : '请求未完成，请核实后再试。';
+              if (res.statusCode === 401 && !anonymous && !accountOperation) token = '';
+              const serverMessage = accountOperation && res.statusCode >= 400 && res.statusCode < 500 && typeof res.data?.message === 'string' ? res.data.message : '';
+              const message = isLogin ? loginFailure(res.statusCode) : serverMessage || (res.statusCode === 409 ? '时段或预约安排已变化，请重新查询。' : res.statusCode === 401 ? '登录已失效，请重新登录。' : res.statusCode === 403 ? '当前患者入口未开放。' : '请求未完成，请核实后再试。');
               fail(message, res.statusCode, res.statusCode >= 400 && res.statusCode < 500);
             }
           },
-          fail() { fail('连接中断，提交结果可能尚未核实。'); }
+          fail(error) {
+            if (!isLogin) { fail('连接中断，提交结果可能尚未核实。'); return; }
+            fail(/timeout|超时/i.test(error?.errMsg || '') ? '登录请求超时，请检查网络后重试。' : '暂时无法连接登录服务，请检查网络后重试。');
+          }
         });
-      } catch (_) { fail('请求未能完成，请核实后再试。'); }
+      } catch (_) { fail(isLogin ? '暂时无法连接登录服务，请检查网络后重试。' : '请求未能完成，请核实后再试。'); }
     });
   }
   async function mutate(kind, appointmentId, body) {
@@ -42,12 +49,23 @@ function createPatientApi(platform, baseUrl, options = {}) {
     return r;
   }
   return {
+    register(body) { return call('/register', 'POST', body, true, true); },
+    async changePassword(body) {
+      const owner = epoch;
+      const result = await call('/password', 'POST', body, false, true);
+      if (!result || result.changed !== true || result.loginRequired !== true) throw Error('尚未确认密码修改结果。');
+      if (owner === epoch) { token = ''; subjectId = ''; epoch++; }
+      return result;
+    },
     async login(credentials) {
+      const loginName = typeof credentials?.loginName === 'string' ? credentials.loginName.trim() : '';
+      const password = credentials?.password;
+      if (!loginName || !password) throw new Error(loginName ? '请输入密码。' : '请输入账号。');
       token = ''; subjectId = ''; const owner = ++epoch;
-      const result = await call('/local-session', 'POST', credentials, true);
+      const result = await call('/local-session', 'POST', {loginName, password}, true);
       if (owner !== epoch || baseUrl()!==originalBase) throw new Error('验证身份已变化，请重新核对。');
       if (!result || result.mode !== 'local-synthetic' || !/^mp_[a-f0-9]{64}$/.test(result.token || '') || !result.patient ||
-        typeof result.patient.subjectId !== 'string' || typeof result.patient.name !== 'string' || typeof result.patient.contact !== 'string') throw new Error('验证结果不完整，请重新验证。');
+        typeof result.patient.subjectId !== 'string' || typeof result.patient.name !== 'string' || typeof result.patient.contact !== 'string') throw new Error('登录结果不完整，请稍后重试。');
       token = result.token;
       subjectId = result.patient.subjectId;
       return { subjectId: result.patient.subjectId, name: result.patient.name, contact: result.patient.contact };
@@ -55,11 +73,8 @@ function createPatientApi(platform, baseUrl, options = {}) {
     quote(selection) { return call('/quote', 'POST', selection); },
     book(body) { return mutate('book',null,body); },
     async session() { const owner=epoch,p = await call('/session', 'GET'); if(owner!==epoch||baseUrl()!==originalBase)throw Error('验证身份已变化。');subjectId=p.subjectId;return p; },
-    mine(cursor, state) {
-      return call('/appointments/queue', 'GET', {
-        limit: '20', ...(state ? { state } : {}), ...(state === 'upcoming' ? { sort: 'soonest' } : {}),
-        ...(cursor ? { cursor } : {}),
-      });
+    mine(cursor, filters = { state: 'all', limit: '20' }) {
+      return call('/appointments/queue', 'GET', { ...filters, ...(cursor ? { cursor } : {}) });
     },
     reschedule(id, body) { return mutate('reschedule',id,body); },
     cancel(id, body) { return mutate('cancel',id,body); },

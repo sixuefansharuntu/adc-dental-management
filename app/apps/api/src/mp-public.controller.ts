@@ -1,5 +1,5 @@
-import{Controller,Inject,Get,Post,Body,Req,Param,Query}from'@nestjs/common';
-import type{Request}from'express';
+import{Controller,Inject,Get,Post,Body,Req,Res,Param,Query}from'@nestjs/common';
+import type{Request,Response}from'express';
 import{BookingService}from'./booking.service';
 import{PatientRequestRetirementService,retirementInput}from'./patient-request-retirement.service';
 import{bookingInput,objectInput,textInput,versionInput}from'./booking-domain';
@@ -10,7 +10,7 @@ import{MpPublicAuth}from'./mp-public.auth';
 
 /**
  * 小程序对外通道（云函数专用）。
- * 路由与 /api/v1/miniprogram/* 一一对应，但鉴权换成 MpPublicAuth：
+ * 预约路由沿用 /api/v1/miniprogram/* 的模型，另提供课程患者账号操作。
  * 只认带签名的云函数请求，令牌用 Bearer mp_，会话语义与网页端一致。
  *
  * 原 /api/v1/miniprogram/* 保持"仅本机 + 非生产"不变，不做任何放开。
@@ -20,6 +20,8 @@ export class MpPublicController{
  constructor(@Inject(MpPublicAuth)private auth:MpPublicAuth,@Inject(BookingService)private bookings:BookingService,@Inject(PatientRequestRetirementService)private retirement:PatientRequestRetirementService){}
 
  @Post('local-session')login(@Req()req:Request,@Body()body:unknown){return this.auth.login(req,body);}
+ @Post('register')register(@Req()req:Request,@Res({passthrough:true})res:Response,@Body()body:unknown){return this.auth.register(req,res,body);}
+ @Post('password')changePassword(@Req()req:Request,@Res({passthrough:true})res:Response,@Body()body:unknown){return this.auth.changePassword(req,res,body);}
 
  @Get('session')async session(@Req()req:Request){const a=await this.auth.patient(req);return{subjectId:a.subjectId,name:a.name,contact:a.contact};}
 

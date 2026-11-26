@@ -59,7 +59,7 @@ function createBookingPage({ api, state, enabled, newRequestId, takePreview = ()
       if (!this._visible || this._dead || this.data.busy) return;
       const field = e.currentTarget.dataset.field, value = e.detail.value;
       if (typeof value !== 'string') return;
-      if (['loginName', 'password'].includes(field)) this.setData({ credentials: { ...this.data.credentials, [field]: value } });
+      if (['loginName', 'password'].includes(field)) this.setData({ credentials: { ...this.data.credentials, [field]: value }, error: '' });
       else if (['name', 'contact', 'intention'].includes(field) && !state.pending && this.data.phase !== 'saved') this.setData({ form: { ...this.data.form, [field]: value }, quote: null, confirmed: false, phase: this.data.patient ? 'ready' : 'needs_login' });
     },
     async onLogin() {

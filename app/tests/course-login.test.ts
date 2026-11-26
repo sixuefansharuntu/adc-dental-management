@@ -4,6 +4,8 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { Request, Response } from 'express';
 import { CourseLoginAccess } from '../apps/api/src/course-login';
 
+const demoRoles = ['patient', 'frontdesk', 'doctor', 'finance', 'clinic-manager', 'hq-review'];
+
 test('课程链接未配置时默认关闭，其他环境拒绝启用', () => {
   const req = { headers: {} } as Request;
   assert.deepEqual(new CourseLoginAccess(true, {}).options(req), []);
@@ -13,7 +15,7 @@ test('课程链接未配置时默认关闭，其他环境拒绝启用', () => {
   }), /专用课程环境/);
 });
 
-test('公开演示只在课程环境显式启用，选项限于三种演示身份', () => {
+test('公开演示只在课程环境显式启用，选项限于指定的六个演示身份', () => {
   const env = { ADC_COURSE_LOGIN_PUBLIC: 'true' };
   const req = { headers: {} } as Request;
   assert.throws(() => new CourseLoginAccess(false, env), /专用课程环境/);
@@ -21,7 +23,7 @@ test('公开演示只在课程环境显式启用，选项限于三种演示身�
   const access = new CourseLoginAccess(true, env, () => 1_000);
   assert.ok(access.enabled);
   assert.ok(access.expires(req) > 1_000);
-  assert.deepEqual(access.options(req).map(a => a.id), ['patient', 'frontdesk', 'doctor']);
+  assert.deepEqual(access.options(req).map(a => a.id), demoRoles);
 });
 
 test('浏览器授权只能在配置截止时间前使用，并在新进程失效', async () => {
@@ -41,7 +43,7 @@ test('浏览器授权只能在配置截止时间前使用，并在新进程失�
   assert.equal(header, '');
   await access.open(invite, res, async () => {});
   const req = { headers: { cookie: header } } as Request;
-  assert.equal(access.options(req).length, 3);
+  assert.deepEqual(access.options(req).map(a => a.id), demoRoles);
   assert.equal(new CourseLoginAccess(true, env, () => now).expires(req), 0);
   now += 5_000;
   assert.deepEqual(access.options(req), []);

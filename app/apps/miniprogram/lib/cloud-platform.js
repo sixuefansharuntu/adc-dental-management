@@ -23,9 +23,6 @@ function toPath(url) {
 
 function createCloudPlatform(wx) {
   function request(opts) {
-    if (/^http:\/\/127\.0\.0\.1:\d+\/api\/v1\//.test(String(opts?.url || ''))) {
-      return wx.request(opts);
-    }
     const path = toPath(opts && opts.url);
     if (path.charAt(0) !== '/') {
       if (opts && opts.fail) opts.fail({ errMsg: '请求地址无效。' });

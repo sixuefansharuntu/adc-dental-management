@@ -18,11 +18,12 @@ const crypto = require('crypto');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
 // 患者通道（需要签名）
-const MP_BASE = process.env.ADC_API_BASE || '';
+const MP_BASE = process.env.ADC_API_BASE || 'https://adc-review.test/api/v1/mp';
 // 公开查询（后端本就匿名可读，代理只为绕开域名校验）
-const PUBLIC_BASE = process.env.ADC_PUBLIC_BASE || '';
+const PUBLIC_BASE = process.env.ADC_PUBLIC_BASE || 'https://adc-review.test/api/v1';
 
 const SECRET = process.env.ADC_MP_SOURCE_SECRET || '';
+const ALLOW_INSECURE = process.env.ADC_ALLOW_INSECURE === 'true'; // 仅当证书链异常时临时开启
 const MAX_BODY = 8 * 1024;
 const TIMEOUT = 12000;
 
@@ -32,7 +33,10 @@ const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const ROUTES = [
   { scope: 'public', method: 'GET', test: p => p === '/catalogue' },
   { scope: 'public', method: 'GET', test: p => p === '/availability' },
+  { scope: 'public', method: 'GET', test: p => p === '/availability/next' },
   { scope: 'mp', method: 'POST', test: p => p === '/local-session' },
+  { scope: 'mp', method: 'POST', test: p => p === '/register' },
+  { scope: 'mp', method: 'POST', test: p => p === '/password' },
   { scope: 'mp', method: 'GET', test: p => p === '/session' },
   { scope: 'mp', method: 'POST', test: p => p === '/logout' },
   { scope: 'mp', method: 'POST', test: p => p === '/quote' },
@@ -63,11 +67,7 @@ function queryOf(data) {
 
 function call(base, method, pathWithQuery, body, token, ts, openid) {
   return new Promise((resolve, reject) => {
-    const target = new URL(base);
-    if (target.protocol !== 'https:' || target.username || target.password || target.search || target.hash) {
-      throw new Error('云函数后端必须为有效的 HTTPS 地址。');
-    }
-    const url = new URL(base.replace(/\/$/, '') + pathWithQuery);
+    const url = new URL(base + pathWithQuery);
     const payload = body === undefined || body === null ? null : Buffer.from(JSON.stringify(body));
     const headers = { 'content-type': 'application/json', 'content-length': payload ? payload.length : 0 };
     if (ts) {
@@ -85,6 +85,7 @@ function call(base, method, pathWithQuery, body, token, ts, openid) {
         method,
         headers,
         timeout: TIMEOUT,
+        rejectUnauthorized: !ALLOW_INSECURE,
       },
       res => {
         const chunks = [];
@@ -144,7 +145,6 @@ exports.main = async event => {
   }
 
   if (route.scope === 'public') {
-    if (!PUBLIC_BASE) return { ok: false, status: 503, message: '云函数未配公开查询地址。' };
     try {
       const r = await call(PUBLIC_BASE, method, path, body, '', '', openid);
       return { ok: r.status >= 200 && r.status < 300, status: r.status, data: r.data };
@@ -153,7 +153,7 @@ exports.main = async event => {
     }
   }
 
-  if (!MP_BASE || SECRET.length < 32) return { ok: false, status: 503, message: '云函数未配置预约后端或签名密钥。' };
+  if (!SECRET || SECRET.length < 32) return { ok: false, status: 503, message: '云函数未配置签名密钥。' };
   if (!openid) return { ok: false, status: 401, message: '无法识别调用者。' };
 
   const token = typeof event.token === 'string' ? event.token : '';

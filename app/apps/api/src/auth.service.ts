@@ -25,7 +25,13 @@ export class AuthService {
  experience(){return this.demo.enabled?'teacher-demo':'standard';}
  patientRegistrationEnabled(){return this.demo.registrationEnabled;}
  async registerPatient(req:Request,res:Response,value:unknown){this.origin(req);return this.registration.register(req,res,value);}
- async changePatientPassword(req:Request,res:Response,value:unknown){this.origin(req);const actor=await this.patient(req);return this.passwords.change(req,res,value,actor,this.cookie(req,'patient'));}
+ async changePatientPassword(req:Request,res:Response,value:unknown){
+  this.origin(req);
+  const actor=await this.patient(req);
+  const result=await this.passwords.change(req,res,value,actor,this.cookie(req,'patient'));
+  res.clearCookie('adc_course_patient',{path:'/api/v1'});
+  return result;
+ }
  private loginThrottle=new LoginThrottle();
  origin(req:Request){if(req.headers.origin!==(process.env.ADMIN_ORIGIN||'http://127.0.0.1:5173'))throw new ForbiddenException('写入请求来源不受允许。');}
  private cookieName(kind:'patient'|'staff'){return(this.demo.enabled?'adc_course_':'adc_')+kind;}

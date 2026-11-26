@@ -6,6 +6,7 @@ Page(createPublicPage({
   today: () => new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10),
   stopRefresh: () => wx.stopPullDownRefresh(),
   scrollToBooking: () => wx.pageScrollTo({ selector: '#booking', duration: 250 }),
+  scrollToDoctors: () => wx.pageScrollTo({ selector: '#booking-doctors', duration: 250 }),
   bookingEnabled: () => getApp().globalData.localBookingEnabled === true,
   changeMode: () => !!(getApp().globalData.miniBookingState || {}).reschedule,
   resetChange: () => { const s = getApp().globalData.miniBookingState; if (s && (!s.pending || s.pending.phase === 'saved')) s.reschedule = null; },

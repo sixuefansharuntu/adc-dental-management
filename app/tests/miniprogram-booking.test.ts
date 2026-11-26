@@ -18,6 +18,14 @@ function setup(extra:any={}){
 async function ready(){const s=setup();s.page.onInput(input('loginName','alice'));s.page.onInput(input('password','synthetic-test-only'));const p=s.page.onLogin();assert.equal(s.page.data.credentials.password,'');s.calls[0].reply({mode:'local-synthetic',token:'mp_'+'a'.repeat(64),patient});await p;s.page.onInput(input('intention','咨询牙齿清洁'));return s;}
 async function quoted(){const s=await ready(),p=s.page.onQuote();s.calls.at(-1).reply(quote);await p;s.page.onConfirm(confirm);return s;}
 test('小程序预约实际入口默认关闭时不验证不发送请求',async()=>{const s=setup({localBookingEnabled:false});await s.page.onLogin();assert.equal(s.page.data.phase,'disabled');assert.equal(s.calls.length,0);});
+test('预约登录提示区分缺项、错凭据、频率限制与断网',async()=>{
+ const {page,calls}=setup();await page.onLogin();assert.match(page.data.error,/输入账号/);assert.equal(calls.length,0);
+ page.onInput(input('loginName','sample'));await page.onLogin();assert.match(page.data.error,/输入密码/);
+ for(const [status,message] of [[401,/账号或密码不正确/],[429,/尝试过于频繁/],[503,/服务暂时无法使用/]] as const){
+  page.onInput(input('password','Wrong123'));const waiting=page.onLogin();calls.at(-1)!.reply({message:'INTERNAL'},status);await waiting;assert.match(page.data.error,message);
+ }
+ page.onInput(input('password','Wrong123'));const waiting=page.onLogin();calls.at(-1)!.fail();await waiting;assert.match(page.data.error,/检查网络/);
+});
 test('原生验证使用独立端点及Bearer，口令清页面且token不进入data',async()=>{
  const{page,calls}=await ready();assert.equal(calls[0].options.path,'/local-session');assert.equal(calls[0].name,'adcApi');assert.equal(calls[0].options.token,'');assert.equal(page.data.patient.subjectId,id(4));assert.equal(JSON.stringify(page.data).includes('mp_'),false);
  const p=page.onQuote();const c=calls[1];assert.equal(c.options.token,'mp_'+'a'.repeat(64));assert.deepEqual(Object.keys(c.options).sort(),['data','method','path','token']);c.reply(quote);await p;assert.equal(page.data.quote.range,'2028-02-29 09:00 — 2028-02-29 09:30');

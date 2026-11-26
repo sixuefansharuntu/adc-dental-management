@@ -11,8 +11,10 @@ export function patientAppointmentsQuery(input:Record<string,unknown>):PatientAp
  const hasFrom=input.fromDate!==undefined&&input.fromDate!=='',hasTo=input.toDate!==undefined&&input.toDate!=='';
  if(hasFrom!==hasTo)throw new BadRequestException('预约日期起止须成对填写。');
  const fromDate=hasFrom?dateInput(input.fromDate):null,toDate=hasTo?dateInput(input.toDate):null;
- if(fromDate&&toDate&&(toDate<fromDate||(Date.parse(toDate)-Date.parse(fromDate))/86400000>=366))
-  throw new BadRequestException('预约日期范围须为1至366天。');
+ if(fromDate&&toDate){
+  if(toDate<fromDate)throw new BadRequestException('预约开始日期不能晚于结束日期。');
+  if((Date.parse(toDate)-Date.parse(fromDate))/86400000>=366)throw new BadRequestException('预约日期范围最多为366天。');
+ }
  const state=input.state??'all';
  if(typeof state!=='string'||!['all','active','upcoming','history','arrived','cancelled','no_show'].includes(state))
   throw new BadRequestException('本人预约状态筛选无效。');

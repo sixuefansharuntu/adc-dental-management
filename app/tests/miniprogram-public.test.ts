@@ -69,6 +69,24 @@ test('空目录为正常结果，不发送缺少筛选的时段请求',async()=>
 test('空时段与错误区分',async()=>{
  const{page,calls}=await ready(),p=page.onDate(pick(page.data.date));calls[2].reply({queriedAt:new Date().toISOString(),groups:[]});await p;assert.equal(page.data.ready,true);assert.equal(page.data.error,'');assert.equal(page.data.slots.length,0);
 });
+test('最近可约日期使用同一公开接口，找到后同步日期、日历与时段',async()=>{
+ const{page,calls}=await ready(),after='2028-01-01',date='2028-01-20';
+ const dayQuery=page.onDate(pick(after));calls[2].reply(result(page,'full'));await dayQuery;
+ const next=page.onFindNext();assert.equal(calls[3].options.path,'/availability/next');
+ assert.deepEqual(calls[3].options.data,{after,clinicId:'east',doctorId:'lin',serviceVersionId:'lin-30'});
+ calls[3].reply({...result(page,'available',date+'T09:00:00+08:00'),date});await next;
+ assert.equal(page.data.date,date);assert.equal(page.data.days[0].key,date);assert.equal(page.data.availableCount,1);
+});
+test('最近可约日期没有安排时保留日期，迟到搜索不能覆盖换医生后的结果',async()=>{
+ const{page,calls}=await ready(),date='2028-01-01';
+ const dayQuery=page.onDate(pick(date));calls[2].reply(result(page,'full'));await dayQuery;
+ let next=page.onFindNext();calls[3].reply({date:null,groups:[],queriedAt:new Date().toISOString(),searchedFrom:'2028-01-02',searchedThrough:'2028-01-10'});await next;
+ assert.equal(page.data.date,date);assert.match(page.data.nextUnavailable,/2028-01-02 至 2028-01-10/);
+ const sameDay=page.onDate(pick(date));calls[4].reply(result(page,'full'));await sameDay;
+ const old={...result(page,'available','2028-01-03T09:00:00+08:00'),date:'2028-01-03'};
+ next=page.onFindNext();const doctor=page.onDoctor(pick(1));calls[6].reply(result(page));await doctor;calls[5].reply(old);await next;
+ assert.equal(page.data.date,date);assert.equal(page.data.selected.doctorId,'zhou');assert.equal(page.data.findingNext,false);
+});
 test('坏目录拒绝并清公开资料，不对坏筛选继续发请求',async()=>{
  for(const items of [null,[{...rows[0],durationMinutes:0}],[rows[0],rows[0]]]){
   const{page,calls}=await ready(),p=page.refresh();calls[2].reply({items});await p;assert.equal(page.data.ready,false);assert.equal(page.data.selected,null);assert.equal(page.data.slots.length,0);assert.ok(page.data.error);assert.equal(calls.length,3);

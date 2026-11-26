@@ -1,12 +1,13 @@
 <script setup lang="ts">
-defineProps<{pending:boolean;state:string;error:string;blocked:boolean;working:boolean;confirmed:boolean;summary:string}>();
-defineEmits<{'verify':[];'retry':[];'finish':[];'update:confirmed':[value:boolean]}>();
+defineProps<{pending:boolean;state:string;error:string;blocked:boolean;working:boolean;confirmed:boolean;summary:string;ownConflict?:boolean}>();
+defineEmits<{'verify':[];'retry':[];'finish':[];'view-appointments':[];'update:confirmed':[value:boolean]}>();
 </script>
 <template>
  <section v-if="pending||error||blocked" class="b-recovery" role="status" aria-label="原预约提交核实">
   <strong>{{pending?'原提交结果核实':'预约办理提示'}}</strong>
   <p v-if="pending&&summary" class="b-original">{{summary}}</p>
   <p v-if="error">{{error}}</p>
+  <button v-if="ownConflict&&!pending&&!blocked" class="b-button outline" type="button" :disabled="working" @click="$emit('view-appointments')">查看我的预约</button>
   <template v-if="pending&&!blocked">
    <p v-if="state==='not_found'">暂未查到原提交的完成结果，这不代表提交已经失败。可以稍后再次核实；如仍需办理，请明确确认后按原请求重试。</p>
    <p v-else-if="state==='processing'">原提交仍在处理中，请稍后再次核实。现在不会补办或重复发送。</p>

@@ -25,6 +25,15 @@ test('原请求先缓存再发出，回复丢失后只读核实不补写',async(
  const verifying=c.model.verify();assert.equal(c.writes.length,1);assert.match(c.reads[0].path,/appointment-commands/);c.reads[0].resolve(status);await verifying;assert.equal(c.writes.length,1);assert.equal(c.model.pending.value,null);assert.equal(c.completed[0].r.originalResult,true);assert.equal(c.map.size,0);
  }finally{c.app.unmount();}
 });
+test('换时段能清除已拒绝的冲突提示，但保留结果不明确的原请求',async()=>{
+ const c=mounted();try{
+  const rejected=c.model.send(path,body,'预约成功');c.writes[0].reject(Object.assign(Error('原时段与本人预约冲突'),{status:409,code:'OWN_APPOINTMENT_OVERLAP'}));await rejected;
+  assert.match(c.model.error.value,/冲突/);assert.equal(c.model.ownConflict.value,true);assert.equal(c.model.pending.value,null);
+  c.model.dismissFeedback();assert.equal(c.model.error.value,'');assert.equal(c.model.ownConflict.value,false);
+  const unknown=c.model.send(path,{...body,requestId:uid(8)},'预约成功');c.writes[1].reject(TypeError('network lost'));await unknown;
+  c.model.dismissFeedback();assert.match(c.model.error.value,/暂不能确认/);assert.equal(c.model.pending.value.body.requestId,uid(8));
+ }finally{c.app.unmount();}
+});
 test('未查到不自动重试，必须明确确认且沿用原请求内容及标识',async()=>{
  const c=mounted(JSON.stringify(pending()));try{const p=c.model.verify();c.reads[0].resolve({state:'not_found',kind:'book'});await p;assert.equal(c.writes.length,0);await c.model.retry(false);assert.equal(c.writes.length,0);
  const r=c.model.retry(true);assert.deepEqual(c.writes[0].body,body);c.writes[0].resolve(saved);await r;assert.equal(c.completed.length,1);assert.equal(c.map.size,0);

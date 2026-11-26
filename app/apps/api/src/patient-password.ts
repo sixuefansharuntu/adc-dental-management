@@ -10,9 +10,9 @@ export function passwordChangeInput(value:unknown){const b=objectInput(value,['o
 export class PatientPasswordChange{
  private throttle=new LoginThrottle(Date.now,512,2);
  constructor(private pool:any,private gate:CourseDemoGate){}
- async change(req:Request,res:Response,value:unknown,actor:{identityId:string;subjectId:string},token:string){
+ async change(req:Request,res:Response,value:unknown,actor:{identityId:string;subjectId:string},token:string,caller=canonicalIp(req.ip||req.socket?.remoteAddress||'')){
   if(!this.gate.enabled||!this.gate.manifest)throw new ForbiddenException('当前身份入口不支持密码修改。');
-  const input=passwordChangeInput(value),ticket=this.throttle.acquire(`${actor.identityId}:${canonicalIp(req.ip||req.socket?.remoteAddress||'')}`);
+  const input=passwordChangeInput(value),ticket=this.throttle.acquire(`${actor.identityId}:${caller}`);
   if(!ticket.allowed){res.setHeader('Retry-After',String(ticket.retryAfter));throw new HttpException('密码尝试过多，请稍后再试。',HttpStatus.TOO_MANY_REQUESTS);}
   let c:any;
   try{
@@ -29,7 +29,7 @@ export class PatientPasswordChange{
    const after={schemaVersion:1,syntheticOnly:true,datasetId:this.gate.manifest.datasetId,identityId:r.identityId,subjectId:r.subjectId,loginName:r.loginName,credentialVersion:version,fromVerifierSha256:demoDigest(r.verifier),toVerifierSha256:demoDigest(verifier)};
    await c.query("INSERT INTO adc.business_operation(operation_id,patient_actor_id,occurred_at,action_code,subject_kind,subject_key,after_content,reason) VALUES($1,$2,clock_timestamp(),'course.patient.password','course_patient_identity',$3,$4,'患者核验原密码后修改；撤销全部旧会话')",[randomUUID(),r.subjectId,r.identityId,JSON.stringify(after)]);
    await c.query('DELETE FROM adc_auth.session WHERE identity_id=$1',[r.identityId]);await c.query('COMMIT');
-   res.clearCookie('adc_course_patient',{path:'/api/v1'});return{changed:true,loginRequired:true};
+   return{changed:true,loginRequired:true};
   }catch(e){if(c)await c.query('ROLLBACK').catch(()=>{});throw e;}finally{c?.release();ticket.finish(true);}
  }
 }

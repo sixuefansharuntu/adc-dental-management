@@ -9,7 +9,7 @@ export function simulateMiniCloud(defaultStatus = 200) {
  } } };
 }
 // Register the actual page entry point with a replaceable wx network boundary.
-export function miniprogramPage(platform:any, base='http://127.0.0.1/api/v1',options:{page?:'index'|'booking'|'appointments'|'recovery';globalData?:any}={}) {
+export function miniprogramPage(platform:any, base='http://127.0.0.1/api/v1',options:{page?:'index'|'booking'|'appointments'|'recovery'|'account';globalData?:any}={}) {
  const entry=fileURLToPath(new URL('../../apps/miniprogram/pages/'+(options.page||'index')+'/index.js',import.meta.url));
  const globalData={apiBaseUrl:base,...options.globalData};
  const storage=new Map();

@@ -54,8 +54,22 @@ export class BookingService {
   const occupied=await this.occupancy(client,s,start,end,exclude);
   if(occupied.some(x=>x.clinic_id!==s.clinic_id)||peakOccupancy(+start,+end,occupied)>=s.capacity_limit)throw new ConflictException('时段已约满或存在医生跨诊所冲突，请另选。');
   if(subject){
-   const conflict=await client.query(`SELECT 1 FROM adc.appointment WHERE ${active} AND (booking_subject_id=$1 OR ($2::uuid IS NOT NULL AND patient_id=$2)) AND scheduled_at<$4 AND scheduled_end_at>$3 AND ($5::uuid IS NULL OR appointment_id<>$5)`,[subject.subjectId,subject.patientId,start,end,exclude||null]);
-   if(conflict.rowCount)throw new ConflictException('您已有相同时段的预约，请选择其他时间。');
+   const {rows:[conflict]}=await client.query(`SELECT a.booking_subject_id=$1 AS own,
+    CASE WHEN a.booking_subject_id=$1 THEN a.scheduled_at END AS "startsAt",
+    CASE WHEN a.booking_subject_id=$1 THEN a.scheduled_end_at END AS "endsAt",
+    CASE WHEN a.booking_subject_id=$1 THEN e.public_name END AS "doctorName"
+    FROM adc.appointment a JOIN adc.employee e ON e.employee_id=a.doctor_id
+    WHERE a.disposition IN ('active','arrived') AND (a.booking_subject_id=$1 OR ($2::uuid IS NOT NULL AND a.patient_id=$2))
+    AND a.scheduled_at<$4 AND a.scheduled_end_at>$3 AND ($5::uuid IS NULL OR a.appointment_id<>$5)
+    ORDER BY own DESC NULLS LAST,a.scheduled_at,a.appointment_id LIMIT 1`,[subject.subjectId,subject.patientId,start,end,exclude||null]);
+   if(conflict){
+    if(!conflict.own)throw new ConflictException('您已有相同时段的预约，请选择其他时间。');
+    const from=time(conflict.startsAt),to=time(conflict.endsAt);
+    const clock=new Intl.DateTimeFormat('zh-CN',{hour:'2-digit',minute:'2-digit',hourCycle:'h23',timeZone:'Asia/Shanghai'});
+    const day=shanghaiDay(+from),endDay=shanghaiDay(+to),doctor=conflict.doctorName?`（${conflict.doctorName}）`:'';
+    const range=`${day} ${clock.format(from)}—${endDay===day?'':endDay+' '}${clock.format(to)}`;
+    throw new ConflictException({statusCode:409,code:'OWN_APPOINTMENT_OVERLAP',message:`所选时段与您 ${range} 的预约${doctor}重叠，请选择其他时间。`});
+   }
   }
   return {schedule:s,startsAt:start.toISOString(),endsAt:end.toISOString(),durationMinutes:s.duration_minutes,
    cancelCutoffAt:new Date(+start-s.self_cancel_lead_minutes*60_000).toISOString(),rescheduleCutoffAt:new Date(+start-s.self_reschedule_lead_minutes*60_000).toISOString(),

@@ -84,12 +84,13 @@ function readAvailability(result, selected, date) {
   slots.sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt) || a.key.localeCompare(b.key));
   return { slots, availableCount: slots.filter(s => s.available).length, queriedAt: clock(result.queriedAt) };
 }
-function createPublicPage({ request, today, stopRefresh, bookingEnabled = () => false, navigate = () => {}, changeMode = () => false, resetChange = () => {}, scrollToBooking = () => {} }) {
+function createPublicPage({ request, today, stopRefresh, bookingEnabled = () => false, navigate = () => {}, changeMode = () => false, resetChange = () => {}, scrollToBooking = () => {}, scrollToDoctors = () => {} }) {
   return {
     data: { clinics: [], clinicNames: [], clinicIndex: 0, doctors: [], doctorNames: [], doctorIndex: 0,
       services: [], serviceNames: [], serviceIndex: 0, selected: null, date: '', slots: [], availableCount: 0,
       queriedAt: '', loading: false, ready: false, error: '', bookingEnabled: false, changing: false,
-      days: [], today: '', groups: [], showUnavailable: false, selectedSlot: null, showDoctor: false },
+      days: [], today: '', groups: [], showUnavailable: false, selectedSlot: null, showDoctor: false,
+      findingNext: false, nextUnavailable: '', nextError: '' },
     onLoad() {
       this._epoch = 0; this._tasks = new Set(); this._visible = true; this._dead = false;
       const date = today();
@@ -104,7 +105,7 @@ function createPublicPage({ request, today, stopRefresh, bookingEnabled = () => 
       if (this._tasks) this._tasks.clear();
     },
     _begin() {
-      this._invalidate(); this.setData({ slots: [], groups: [], selectedSlot: null, showUnavailable: false, availableCount: 0, queriedAt: '', loading: true, error: '' });
+      this._invalidate(); this.setData({ slots: [], groups: [], selectedSlot: null, showUnavailable: false, availableCount: 0, queriedAt: '', loading: true, error: '', findingNext: false, nextUnavailable: '', nextError: '' });
       return this._epoch;
     },
     _current(token) { return !this._dead && this._visible && token === this._epoch; },
@@ -177,6 +178,35 @@ function createPublicPage({ request, today, stopRefresh, bookingEnabled = () => 
       this.setData({ date: currentDay, today: currentDay, days: calendar(currentDay, currentDay) });
       return this._query();
     },
+    async onFindNext() {
+      const {selected, date, loading, findingNext, availableCount, error, nextUnavailable} = this.data;
+      if (!this._visible || this._dead || !selected || loading || findingNext || availableCount || error || nextUnavailable) return;
+      this._invalidate();
+      const token = this._epoch;
+      this.setData({ findingNext: true, nextError: '' });
+      try {
+        const { clinicId, doctorId, serviceVersionId } = selected;
+        const result = await this._get('/availability/next', { after: date, clinicId, doctorId, serviceVersionId });
+        if (!this._current(token)) return;
+        if (!result || !instant(result.queriedAt) || !Array.isArray(result.groups)) throw Error('查询结果不完整，请重试。');
+        if (result.date === null && result.groups.length === 0) {
+          const { searchedFrom, searchedThrough } = result;
+          const period = validDate(searchedFrom) && validDate(searchedThrough) ? searchedFrom + ' 至 ' + searchedThrough : '当前开放预约范围内';
+          this.setData({ nextUnavailable: period + '，当前医生和服务暂无可约时段。' });
+          return;
+        }
+        if (!validDate(result.date) || result.date <= date) throw Error('查询结果不完整，请重试。');
+        const availability = readAvailability(result, selected, result.date);
+        if (!availability.availableCount) throw Error('可约时段已变化，请重新查找。');
+        const currentDay = today();
+        const start = this.data.days.some(item => item.key === result.date) ? this.data.days[0].key : result.date;
+        this.setData({ ...availability, date: result.date, today: currentDay, days: calendar(start, currentDay),
+          groups: slotGroups(availability.slots, false), showUnavailable: false, selectedSlot: null });
+      } catch (e) {
+        if (this._current(token)) this.setData({ nextError: e.message || '查询失败，请重试。' });
+      } finally { if (this._current(token)) this.setData({ findingNext: false }); }
+    },
+    onFocusDoctors() { scrollToDoctors(); },
     onScrollToBooking() { scrollToBooking(); },
     onToggleDoctor() { this.setData({ showDoctor: !this.data.showDoctor }); },
     onToggleUnavailable() {

@@ -26,6 +26,9 @@
 .day.chosen { background: #174852; color: #fff; }
 .date-picker { display: flex; align-items: center; min-height: 88rpx; font-size: 28rpx; color: #195967; font-weight: 600; }
 .availability, .period { color: #35595b; font-size: 28rpx; font-weight: 600; }
+.schedule-empty { margin-top: 18rpx; }
+.empty-actions { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 18rpx; }
+.empty-actions button { width: auto; }
 .time-group { margin-top: 18rpx; }
 .time-slot { font-variant-numeric: tabular-nums; }
 .doctor-option.chosen, .time-slot.chosen { border-color: #59868c; background: #e6f2f3; font-weight: 650; }

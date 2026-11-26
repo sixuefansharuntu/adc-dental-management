@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { requestAbort } from './request-abort';
+import { missingLoginInput, loginFailure } from './login-feedback';
 import{useTreatmentHandoff}from'./use-treatment-handoff';
 import{useVisitHandoff}from'./use-visit-handoff';
 import WorkflowGuide from './WorkflowGuide.vue';
@@ -78,13 +80,13 @@ const recovery=useBookingRecovery({identity:()=>patientOnly?patient.value:null,s
  read:(path,signal)=>api(path,undefined,signal),write:(path,body)=>api(path,body),
  unauthorized:()=>{patient.value=null;selection.value=null;rescheduling.value=null;cancelTarget.value=null;},
  completed:async(r,label)=>{selection.value=null;cancelTarget.value=null;rescheduling.value=null;retryConfirmed.value=false;notice.value=r.originalResult||r.repeated?'原提交已完成，已找回当次结果；当前状态请查看预约列表。':label;tab.value='mine';await Promise.all([loadMine(),loadAvailability()]);}});
-const{pending:uncertain,state:recoveryState,error:recoveryError,blocked:recoveryBlocked,working:recoveryWorking}=recovery;
+const{pending:uncertain,state:recoveryState,error:recoveryError,blocked:recoveryBlocked,working:recoveryWorking,ownConflict}=recovery;
 const recoverySummary=computed(()=>{const p=uncertain.value;if(!p)return'';const kind=pendingKind(p);return (kind==='book'?'原预约':kind==='reschedule'?'原改约请求':'原取消请求')+(kind==='book'?'':' · 预约编号 '+p.path.split('/')[3].slice(0,8).toUpperCase())+'\n'+(kind==='cancel'?'原取消原因：'+p.body.reason:'原选定开始时间：'+full(p.body.startsAt));});
 function recoverPending(){if(patientOnly)recovery.restore();}
 async function verifyPending(){retryConfirmed.value=false;await recovery.verify();}
 async function retryPending(){await recovery.retry(retryConfirmed.value);retryConfirmed.value=false;}
-class ApiError extends Error{constructor(public status:number,message:string){super(message);}}
-async function api<T=any>(path:string,body?:any,signal?:AbortSignal):Promise<T>{const c=new AbortController(),timer=setTimeout(()=>c.abort(),12000);try{const r=await fetch('/api/v1'+path,{method:body?'POST':'GET',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,signal:signal?AbortSignal.any([c.signal,signal]):c.signal});const b=await r.json().catch(()=>({}));if(!r.ok)throw new ApiError(r.status,b.message||'请求失败，请稍后重试。');return b;}finally{clearTimeout(timer);}}
+class ApiError extends Error{constructor(public status:number,message:string,public code?:string){super(message);}}
+async function api<T=any>(path:string,body?:any,signal?:AbortSignal):Promise<T>{const abort=requestAbort(12000,signal);try{const r=await fetch('/api/v1'+path,{method:body?'POST':'GET',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,signal:abort.signal});const b=await r.json().catch(()=>({}));if(!r.ok)throw new ApiError(r.status,b.message||'请求失败，请稍后重试。',b.code);return b;}finally{abort.dispose();}}
 async function loadDemoAccounts(enabled:boolean,invite:string|null,publicLogin:boolean){
  if(!enabled){if(invite!==null)demoAccessNotice.value='演示登录未启用或邀请已过期。';return;}
  try{
@@ -116,6 +118,7 @@ async function selectSlot(group:Group,slot:Slot,event:MouseEvent){
 async function openSlotReview(){
  const pending=selectedSlot.value;
  if(!pending||busy.value||loading.value)return;
+ recovery.dismissFeedback();
  await choose(pending.group,pending.slot);
  if(selection.value){await nextTick();reviewDialogTitle.value?.focus();}
 }
@@ -183,13 +186,17 @@ async function patientAuthenticated(actor:any){patient.value=actor;name.value=ac
 function openLogin(kind:'patient'|'staff'){loginKind.value=kind;staffDemoRole.value='';loginName.value=kind==='patient'?'alice':'front.east';password.value='';loginError.value='';}
 async function login(){
  if(busy.value||loginKind.value!=='staff')return;
+ loginError.value=staffDemoRole.value?'':missingLoginInput(loginName.value,password.value);
+ if(loginError.value)return;
  busy.value=true;loginError.value='';
+ let accepted=false;
  try{
   if(staffDemoRole.value)await api('/demo/session',{role:staffDemoRole.value});
   else await api('/staff/session',{loginName:loginName.value,password:password.value});
+  accepted=true;
   staff.value=await api('/staff/session');chooseArea();
   loginKind.value='';password.value='';notice.value='已登录，可以继续操作。';
- }catch(e){loginError.value=explain(e);}finally{busy.value=false;}
+ }catch(e){loginError.value=accepted&&e instanceof ApiError&&e.status===401?'登录会话未建立，请退出当前页面后重新打开再试。':loginFailure(e,!!staffDemoRole.value);}finally{busy.value=false;}
 }
 async function logout(){if(!patientOnly&&securityPending.value){error.value='请先核实账号管理原提交，再退出身份。';return;}if(uncertain.value){error.value='请先核实结果不明的提交，再退出身份。';return;}busy.value=true;try{const kind=patientOnly?'patient':'staff';await api(`/${kind}/logout`,{});if(patientOnly){patient.value=null;resetMine();selection.value=null;rescheduling.value=null;cancelTarget.value=null;tab.value='book';}else{staff.value=null;staffRows.value=[];}notice.value='已退出登录。';}catch(e){error.value=explain(e);}finally{busy.value=false;}}
 function selectionBody(g:Group,s:Slot){return {scheduleId:g.scheduleId,serviceVersionId:g.serviceVersionId,ruleVersionId:g.ruleVersionId,startsAt:s.startsAt};}
@@ -200,6 +207,7 @@ async function cancel(){if(!cancelTarget.value||!confirmed.value)return;await su
 function startReschedule(a:Appointment){if(uncertain.value){error.value='请先核实原提交。';return;}rescheduling.value=a;selection.value=null;selectedSlot.value=null;tab.value='book';notice.value='请选择新的安排。新预约成功前，原预约继续有效。';window.scrollTo({top:0,behavior:'smooth'});}
 async function startCancel(a:Appointment){
  if(uncertain.value){error.value='请先核实原提交。';return;}
+ recovery.dismissFeedback();
  cancelButton=document.activeElement instanceof HTMLElement?document.activeElement:null;
  cancelTarget.value=a;reason.value='';confirmed.value=false;error.value='';
  await nextTick();reviewDialogTitle.value?.focus();
@@ -209,10 +217,15 @@ async function closeDialog(){
  if(busy.value||uncertain.value)return;
  const returnToReview=Boolean(selection.value);
  selection.value=null;cancelTarget.value=null;
+ recovery.dismissFeedback();
  await nextTick();
  if(returnToReview)reviewButton.value?.focus();
  else cancelButton?.focus();
  cancelButton=null;
+}
+async function viewConflictingAppointments(){
+ if(!ownConflict.value||busy.value||uncertain.value)return;
+ await closeDialog();rescheduling.value=null;openMyAppointments();
 }
 function cycleReviewFocus(event:KeyboardEvent){
  const form=event.currentTarget as HTMLFormElement;
@@ -239,7 +252,7 @@ onMounted(async()=>{const invite=takeDemoInvite();try{const r=await api('/catalo
    <div v-if="courseDemo&&patientOnly" class="b-alert success b-course-notice" role="status"><ShieldCheck :size="17"/><span>课程演示，请使用合成资料{{registrationAvailable?'，联系电话尚未验证。':'。请使用分配的演示账号。'}}</span></div>
    <div v-else-if="courseDemo" class="b-alert success" role="status"><ShieldCheck :size="18"/>课程演示 · 仅使用合成资料；{{registrationAvailable?'患者可自助注册，联系电话尚未验证。':'患者请使用分配的演示账号。'}}</div>
    <div v-if="error" role="alert" class="b-alert error">{{error}} <button aria-label="关闭错误提示" @click="error=''">×</button></div><div v-if="notice" role="status" class="b-alert success"><Check :size="18"/>{{notice}}<button aria-label="关闭成功提示" @click="notice=''">×</button></div>
-   <template v-if="!selection&&!cancelTarget"><BookingRecoveryPanel :pending="!!uncertain" :summary="recoverySummary" :state="recoveryState" :error="recoveryError" :blocked="recoveryBlocked" :working="busy||recoveryWorking" v-model:confirmed="retryConfirmed" @verify="verifyPending" @retry="retryPending" @finish="recovery.finish"/></template>
+   <template v-if="!selection&&!cancelTarget"><BookingRecoveryPanel :pending="!!uncertain" :summary="recoverySummary" :state="recoveryState" :error="recoveryError" :blocked="recoveryBlocked" :working="busy||recoveryWorking" v-model:confirmed="retryConfirmed" @verify="verifyPending" @retry="retryPending" :own-conflict="ownConflict" @view-appointments="viewConflictingAppointments" @finish="recovery.finish"/></template>
    <template v-if="patientOnly">
      <section v-if="tab==='book'&&!rescheduling" class="patient-welcome" aria-labelledby="patient-welcome-title">
       <div class="patient-welcome-copy">
@@ -392,7 +405,7 @@ onMounted(async()=>{const invite=takeDemoInvite();try{const r=await api('/catalo
  <PatientPasswordDialog v-if="passwordDialog&&patient" :api="api" @close="passwordDialog=false" @reauthenticate="patientPasswordChanged"/>
  <PatientAccessDialog v-if="loginKind==='patient'" :registration-allowed="registrationAvailable" :course-demo="courseDemo" :demo-accounts="patientDemoAccounts" :api="api" @close="loginKind=''" @authenticated="patientAuthenticated"/>
  <div v-if="loginKind==='staff'" class="b-backdrop">
-  <form class="b-dialog" @submit.prevent="login">
+  <form class="b-dialog" novalidate @submit.prevent="login">
    <button type="button" class="b-close" aria-label="关闭登录" :disabled="busy" @click="loginKind='';password=''"><X :size="21"/></button>
    <div class="b-dialog-icon"><LockKeyhole :size="24"/></div>
    <h2>登录员工账号</h2>
@@ -400,14 +413,14 @@ onMounted(async()=>{const invite=takeDemoInvite();try{const r=await api('/catalo
    <div v-if="loginError" class="b-alert error" role="alert">{{loginError}}</div>
    <DemoAccountPicker v-if="staffDemoAccounts.length" v-model="staffDemoRole" :accounts="staffDemoAccounts" label="员工账号" :busy="busy" @update:model-value="password='';loginError=''"/>
    <template v-if="!staffDemoRole">
-    <label>{{staffDemoAccounts.length?'登录名':'员工账号'}}<input v-model="loginName" autocomplete="username" required/></label>
-    <label>密码<input v-model="password" type="password" autocomplete="current-password" required maxlength="200"/></label>
+    <label>{{staffDemoAccounts.length?'登录名':'员工账号'}}<input v-model="loginName" autocomplete="username" autocapitalize="none" :spellcheck="false" required maxlength="100" @input="loginError=''"/></label>
+    <label>密码<input v-model="password" type="password" autocomplete="current-password" required maxlength="200" @input="loginError=''"/></label>
    </template>
    <div class="b-help">账号与岗位权限由系统管理员管理。</div>
    <button class="b-button full" :disabled="busy">{{busy?'正在验证…':'确认登录'}}</button>
   </form>
  </div>
- <div v-if="selection||cancelTarget" v-show="!loginKind" class="b-backdrop"><form class="b-dialog wide" role="dialog" aria-modal="true" aria-labelledby="patient-review-title" @keydown.esc="closeDialog" @keydown.tab="cycleReviewFocus" @submit.prevent="cancelTarget?cancel():book()"><button class="b-close" type="button" aria-label="关闭核对" :disabled="busy||!!uncertain" @click="closeDialog"><X :size="21"/></button><h2 id="patient-review-title" ref="reviewDialogTitle" tabindex="-1">{{cancelTarget?'确认取消预约':rescheduling?'核对新的就诊安排':'核对就诊安排'}}</h2><div v-if="error" class="b-alert error" role="alert">{{error}}</div><div class="b-summary" v-if="selection"><strong>{{full(selection.quote.startsAt)}} — {{bookingTimeRange(selection.quote.startsAt,selection.quote.endsAt).split('—')[1]}}</strong><span>{{selection.quote.doctorName}} · {{selection.quote.serviceName}}</span><span>{{selection.quote.clinicName}}</span><small>地址：{{selection.quote.address}}</small><small>自助改约须早于：{{full(selection.quote.rescheduleCutoffAt)}}</small><small>自助取消须早于：{{full(selection.quote.cancelCutoffAt)}}</small></div><div v-if="cancelTarget" class="b-summary"><strong>{{full(cancelTarget.startsAt)}} · {{cancelTarget.doctorName}}</strong><span>{{cancelTarget.clinicName}}</span><small>取消截止：{{full(cancelTarget.cancelCutoffAt)}} 前</small></div><template v-if="selection"><div v-if="!patient" class="b-alert warning">提交前请先登录患者账号。<button type="button" @click="openLogin('patient')">去登录</button></div><div class="b-two-fields"><label>预约人姓名<input v-model="name" :disabled="!!uncertain" required maxlength="100"/></label><label>联系电话<input v-model="contact" :disabled="!!uncertain" required maxlength="40" inputmode="tel"/></label></div><label>就诊意向<textarea v-model="intention" :disabled="!!uncertain" required maxlength="500" placeholder="请简述希望咨询的问题，无需填写详细病历。" rows="2"/></label></template><label v-if="cancelTarget">取消原因<textarea v-model="reason" :disabled="!!uncertain" required maxlength="500" rows="2" placeholder="请简述取消原因"/></label><label class="b-checkbox"><input v-model="confirmed" type="checkbox" required/><span>{{cancelTarget?'我确认取消本次预约，系统将释放本次占用。':'我已核对起止时间、服务时长和变更截止规则。'}}</span></label><BookingRecoveryPanel :pending="!!uncertain" :summary="recoverySummary" :state="recoveryState" :error="recoveryError" :blocked="recoveryBlocked" :working="busy||recoveryWorking" v-model:confirmed="retryConfirmed" @verify="verifyPending" @retry="retryPending" @finish="recovery.finish"/><button v-if="!uncertain" class="b-button full" :disabled="busy||recoveryWorking||recoveryBlocked||((patient||cancelTarget)&&!confirmed)" :formnovalidate="!patient&&!cancelTarget">{{busy?'正在保存…':cancelTarget?'确认取消':!patient?'先登录患者账号':rescheduling?'确认改约':'确认预约'}}</button><p class="b-help">{{cancelTarget?'取消不撤销真实就诊、治疗或收款。':'提交时再次检查容量与冲突，成功后立即确认。'}}</p></form></div>
+ <div v-if="selection||cancelTarget" v-show="!loginKind" class="b-backdrop"><form class="b-dialog wide" role="dialog" aria-modal="true" aria-labelledby="patient-review-title" @keydown.esc="closeDialog" @keydown.tab="cycleReviewFocus" @submit.prevent="cancelTarget?cancel():book()"><button class="b-close" type="button" aria-label="关闭核对" :disabled="busy||!!uncertain" @click="closeDialog"><X :size="21"/></button><h2 id="patient-review-title" ref="reviewDialogTitle" tabindex="-1">{{cancelTarget?'确认取消预约':rescheduling?'核对新的就诊安排':'核对就诊安排'}}</h2><div v-if="error" class="b-alert error" role="alert">{{error}}</div><div class="b-summary" v-if="selection"><strong>{{full(selection.quote.startsAt)}} — {{bookingTimeRange(selection.quote.startsAt,selection.quote.endsAt).split('—')[1]}}</strong><span>{{selection.quote.doctorName}} · {{selection.quote.serviceName}}</span><span>{{selection.quote.clinicName}}</span><small>地址：{{selection.quote.address}}</small><small>自助改约须早于：{{full(selection.quote.rescheduleCutoffAt)}}</small><small>自助取消须早于：{{full(selection.quote.cancelCutoffAt)}}</small></div><div v-if="cancelTarget" class="b-summary"><strong>{{full(cancelTarget.startsAt)}} · {{cancelTarget.doctorName}}</strong><span>{{cancelTarget.clinicName}}</span><small>取消截止：{{full(cancelTarget.cancelCutoffAt)}} 前</small></div><template v-if="selection"><div v-if="!patient" class="b-alert warning">提交前请先登录患者账号。<button type="button" @click="openLogin('patient')">去登录</button></div><div class="b-two-fields"><label>预约人姓名<input v-model="name" :disabled="!!uncertain" required maxlength="100"/></label><label>联系电话<input v-model="contact" :disabled="!!uncertain" required maxlength="40" inputmode="tel"/></label></div><label>就诊意向<textarea v-model="intention" :disabled="!!uncertain" required maxlength="500" placeholder="请简述希望咨询的问题，无需填写详细病历。" rows="2"/></label></template><label v-if="cancelTarget">取消原因<textarea v-model="reason" :disabled="!!uncertain" required maxlength="500" rows="2" placeholder="请简述取消原因"/></label><label class="b-checkbox"><input v-model="confirmed" type="checkbox" required/><span>{{cancelTarget?'我确认取消本次预约，系统将释放本次占用。':'我已核对起止时间、服务时长和变更截止规则。'}}</span></label><BookingRecoveryPanel :pending="!!uncertain" :summary="recoverySummary" :state="recoveryState" :error="recoveryError" :blocked="recoveryBlocked" :working="busy||recoveryWorking" v-model:confirmed="retryConfirmed" @verify="verifyPending" @retry="retryPending" :own-conflict="ownConflict" @view-appointments="viewConflictingAppointments" @finish="recovery.finish"/><button v-if="!uncertain" class="b-button full" :disabled="busy||recoveryWorking||recoveryBlocked||((patient||cancelTarget)&&!confirmed)" :formnovalidate="!patient&&!cancelTarget">{{busy?'正在保存…':cancelTarget?'确认取消':!patient?'先登录患者账号':rescheduling?'确认改约':'确认预约'}}</button><p class="b-help">{{cancelTarget?'取消不撤销真实就诊、治疗或收款。':'提交时再次检查容量与冲突，成功后立即确认。'}}</p></form></div>
 </div>
 </template>
 

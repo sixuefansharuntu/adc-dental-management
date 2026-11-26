@@ -1,0 +1,8 @@
+.password-help { display: grid; gap: 8rpx; padding: 16rpx 20rpx; margin-top: 10rpx; border: 1rpx solid #d5e1df; border-radius: 14rpx; background: #f6faf9; color: #35595b; }
+.password-help-title, .password-status { font-weight: 650; }
+.password-help, .field-error, .rule-met { font-size: 26rpx; line-height: 1.45; }
+.password-rule { display: flex; align-items: baseline; gap: 12rpx; }
+.password-status { flex: none; }
+.field-error { color: #93442e; }
+.rule-met { color: #23634d; }
+.entry.invalid { border-color: #ac6653; }

@@ -11,18 +11,24 @@ test('未知取消未见结果须确认才重试，原正文不变',async()=>{le
 test('未知操作期间禁止开启第二笔取消或改约',async()=>{const{p,state}=setup();await p.onLoad();state.pending={kind:'book',phase:'unknown',subjectId:'a'};p.chooseCancel(event);p.reschedule(event);assert.equal(p.data.selected,null);assert.equal(state.reschedule,undefined);});
 test('隐藏使迟到的本人列表无效，返回重新读取',async()=>{let resolve:any;const{p}=setup({mine:()=>new Promise(r=>{resolve=r;})});const load=p.onLoad();await new Promise(r=>setImmediate(r));p.onHide();resolve({items:[row],nextCursor:null});await load;assert.equal(p.data.rows.length,0);});
 test('分页失败清旧游标和列表，避免拼接失效数据',async()=>{let n=0;const{p}=setup({mine:async()=>{if(n++)throw Error('分页失效');return{items:[row],nextCursor:'cursor'};}});await p.onLoad();await p.more();assert.equal(p.data.rows.length,0);assert.equal(p.data.cursor,null);assert.match(p.data.error,/失效/);});
-test('小程序预约分组切换重置游标，详情可展开，续页只查询当前分组',async()=>{
+test('小程序修改预约筛选重置游标，详情可展开，续页沿用已提交筛选',async()=>{
  const requests:unknown[][]=[];
- const {p}=setup({mine:async(cursor:unknown,view:unknown)=>{
-  requests.push([cursor,view]);
-  return {items:[row],nextCursor:cursor?null:'new-page'};
+ const {p}=setup({mine:async(cursor:unknown,filters:unknown)=>{
+  requests.push([cursor,filters]);
+  return {items:[row],clinics:[{id:'east',name:'东城'}],nextCursor:cursor?null:'new-page',total:2,summary:{total:2}};
  }});
  await p.onLoad();
  p.toggleDetail(event);
  assert.equal(p.data.detailId,'original');
  assert.equal(p.data.rows[0].shortId,'ORIGINAL');
- await p.changeView({currentTarget:{dataset:{view:'history'}}});
+ const change=(field:string,value:string)=>p.changeFilter({currentTarget:{dataset:{field}},detail:{value}});
+ change('stateIndex','4');change('clinicIndex','1');change('limitIndex','0');change('fromDate','2028-01-01');
+ await p.refresh();assert.match(p.data.error,/开始和结束日期/);assert.equal(requests.length,1);
+ change('toDate','2028-01-31');await p.more();assert.equal(requests.length,1);
+ await p.refresh();
  assert.equal(p.data.detailId,'');
  await p.more();
- assert.deepEqual(requests,[[null,'upcoming'],[null,'history'],['new-page','history']]);
+ const filters={state:'cancelled',limit:'10',clinicId:'east',fromDate:'2028-01-01',toDate:'2028-01-31'};
+ assert.deepEqual(requests,[[null,{state:'all',limit:'20'}],[null,filters],['new-page',filters]]);
+ assert.equal(p.data.summary.total,2);
 });

@@ -9,8 +9,11 @@
 .appointment-detail-button { flex: 1 0 auto; }
 .appointment-facts, .appointment-details { border-top: 1rpx solid #d9e5e4; margin-top: 16rpx; padding-top: 9rpx; }
 .appointment-details { font-size: 28rpx; }
-.appointment-tabs { display:flex; gap: 24rpx; }
-.appointment-tabs button { min-height: 88rpx; border-bottom: 4rpx solid transparent; border-radius: 0; background: transparent; color: #4d6566; font-size: 28rpx; padding: 18rpx 2rpx; }
-.appointment-tabs .current { border-bottom-color: #195967; color: #174852; font-weight: 700; }
+.filter-grid, .overview { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10rpx 18rpx; }
+.filter-grid picker { min-width: 0; }
+.filter-grid .entry { display: flex; align-items: center; overflow-wrap: anywhere; font-size: 26rpx; }
+.filter-actions { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 16rpx; }
+.overview { text-align: center; }
+.overview text { font-size: 42rpx; color: #195967; font-weight: 650; }
 .more { width: 100%; }
 .recovery-link { margin-top: 20rpx; }

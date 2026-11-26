@@ -22,7 +22,7 @@ try{
    const catalogue=await call('/catalogue');ok(catalogue);
    assert.equal(catalogue.json.teacherDemoLoginEnabled,true);
    assert.equal(catalogue.json.teacherDemoLoginPublic,true);
-   const anonymous=await call('/demo/options');ok(anonymous);assert.equal(anonymous.json.items.length,3);
+   const anonymous=await call('/demo/options');ok(anonymous);assert.equal(anonymous.json.items.length,6);
    ok(await call('/demo/access',{invite}),403);
    const offOrigin=await fetch(url+'/demo/session',{method:'POST',headers:{'Content-Type':'application/json',Origin:'https://example.test'},body:JSON.stringify({role:'doctor'})});
    assert.equal(offOrigin.status,403);
@@ -41,18 +41,26 @@ try{
    const offOrigin=await fetch(url+'/demo/session',{method:'POST',headers:{'Content-Type':'application/json',Origin:'https://example.test',Cookie:review},body:JSON.stringify({role:'doctor'})});
    assert.equal(offOrigin.status,403);
   });
-  await check('快捷登录只提供演示患者、东城前台、东城医生，三人用原会话和岗位访问',async()=>{
+  await check('快捷登录提供演示患者和五个员工身份，分别按原岗位访问',async()=>{
    const options=await call('/demo/options',undefined,review);ok(options);
-   assert.deepEqual(options.json.items.map((a:any)=>a.loginName),['alice','front.east','doctor.lin']);
+   assert.deepEqual(options.json.items.map((a:any)=>a.loginName),['alice','front.east','doctor.lin','finance.hq','manager.east','review.hq']);
    assert.ok(options.json.items.every((a:any)=>Object.keys(a).sort().join()===['id','kind','label','loginName'].sort().join()));
    ok(await call('/demo/session',{role:'admin.local'},review),400);
    ok(await call('/demo/session',{role:'doctor',loginName:'admin.local'},review),400);
-   for(const [role,kind,expected] of [['patient','patient','identity-alice'],['frontdesk','staff','account-front-east'],['doctor','staff','account171-lin']]){
+   const identities=[
+    ['patient','patient','identity-alice',null],
+    ['frontdesk','staff','account-front-east','appointment.read'],
+    ['doctor','staff','account171-lin','clinical.read'],
+    ['finance','staff','account176-finance','quarter.calculate'],
+    ['clinic-manager','staff','account173-manager','quarter.submit'],
+    ['hq-review','staff','account176-review','quarter.review'],
+   ];
+   for(const [role,kind,expected,permission] of identities){
     const r=await call('/demo/session',{role},review);ok(r,201);
     assert.match(r.setCookie,/Max-Age=2700/);assert.match(r.setCookie,/; Secure/i);
     const s=await call('/'+kind+'/session',undefined,r.cookie);ok(s);
-    assert.equal(s.json[kind==='patient'?'identityId':'accountId'],id(expected));
-    if(kind==='staff')assert.ok(s.json.functions.includes(role==='doctor'?'clinical.read':'appointment.read'));
+    assert.equal(s.json[kind==='patient'?'identityId':'accountId'],id(expected!));
+    if(permission){assert.ok(s.json.functions.includes(permission));assert.ok(!s.json.functions.includes('security.manage'));}
     ok(await call('/'+kind+'/logout',{},r.cookie),201);
     ok(await call('/'+kind+'/session',undefined,r.cookie),401);
    }

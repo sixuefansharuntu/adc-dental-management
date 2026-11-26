@@ -3,7 +3,7 @@ function createPublicGet(platform, baseUrl) {
   return function publicGet(path, data) {
     let task;
     const promise = new Promise((resolve, reject) => {
-      if (path !== '/catalogue' && path !== '/availability') {
+      if (!['/catalogue', '/availability', '/availability/next'].includes(path)) {
         reject(new Error('不支持的公开查询。')); return;
       }
       try {

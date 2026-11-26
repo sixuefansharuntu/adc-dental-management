@@ -6,13 +6,14 @@
   <block wx:if="{{enabled}}">
     <view wx:if="{{!verified}}" class="profile">
       <view class="section-title">登录原患者账号</view>
-      <label class="form-label" for="recover-name">演示账号</label>
+      <label class="form-label" for="recover-name">患者账号</label>
       <input id="recover-name" class="entry" data-field="loginName" bindinput="input" value="{{loginName}}" disabled="{{busy}}"/>
       <label class="form-label" for="recover-password">密码</label>
       <input id="recover-password" class="entry" password="{{true}}" data-field="password" bindinput="input" value="{{password}}" disabled="{{busy}}"/>
+      <view wx:if="{{message}}" class="error" aria-live="polite">{{message}}</view>
       <view class="action-stack"><button class="primary" bindtap="login" disabled="{{busy}}" loading="{{busy}}">登录</button></view>
     </view>
-    <view wx:if="{{message}}" class="notice" aria-live="polite">{{message}}</view>
+    <view wx:if="{{verified && message}}" class="notice" aria-live="polite">{{message}}</view>
     <view wx:if="{{verified && receipt}}" class="profile">
       <button class="primary" bindtap="recover" disabled="{{busy}}" loading="{{busy}}">查询原请求结果</button>
       <view wx:if="{{canRetire}}">

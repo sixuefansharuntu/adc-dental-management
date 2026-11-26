@@ -40,11 +40,13 @@
 
       <view wx:if="{{!patient}}" class="profile">
         <view class="section-title">患者登录</view>
-        <label class="form-label" for="patient-name">演示账号</label>
+        <label class="form-label" for="patient-name">患者账号</label>
         <input id="patient-name" class="entry" value="{{credentials.loginName}}" maxlength="100" data-field="loginName" bindinput="onInput" disabled="{{busy}}"/>
         <label class="form-label" for="patient-password">密码</label>
-        <input id="patient-password" class="entry" password="{{true}}" value="{{credentials.password}}" maxlength="128" data-field="password" bindinput="onInput" disabled="{{busy}}"/>
+        <input id="patient-password" class="entry" password="{{true}}" value="{{credentials.password}}" maxlength="200" data-field="password" bindinput="onInput" disabled="{{busy}}"/>
+        <view wx:if="{{error}}" class="error" aria-live="polite">{{error}}</view>
         <view class="action-stack"><button class="primary" bindtap="onLogin" disabled="{{busy}}" loading="{{busy}}">登录</button></view>
+        <navigator wx:if="{{!busy}}" class="text-button account-link" url="/pages/account/index?mode=register">新用户？注册患者账号</navigator>
       </view>
       <view wx:elif="{{phase === 'unknown'}}" class="profile">
         <view class="section-title">提交结果待确认</view>
@@ -76,6 +78,6 @@
       </view>
       <button wx:if="{{patient && phase !== 'unknown'}}" class="text-button" bindtap="onLogout" disabled="{{busy}}">退出登录</button>
     </block>
-    <view wx:if="{{error}}" class="error" aria-live="polite">{{error}}</view>
+    <view wx:if="{{error && (patient || phase !== 'needs_login')}}" class="error" aria-live="polite">{{error}}</view>
   </block>
 </view>
