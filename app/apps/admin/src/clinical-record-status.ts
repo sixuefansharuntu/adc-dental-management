@@ -1,0 +1,6 @@
+const uuid=(v:any)=>typeof v==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(v);
+export function isRecordPending(p:any){return typeof p?.path==='string'&&/^\/visits\/[^/]+\/record$/.test(p.path);}
+export function recordPendingTarget(p:any){const m=p?.path?.match(/^\/visits\/([a-f0-9-]{36})\/record$/i);if(!m||!uuid(m[1])||!uuid(p.body?.requestId)||!Number.isSafeInteger(p.body.recordVersion)||p.body.recordVersion<0)throw Error('原病历请求目标无效，请保留原记录。');return{requestId:p.body.requestId.toLowerCase(),visitId:m[1].toLowerCase()};}
+export function validRecordStatus(p:any,r:any){const t=recordPendingTarget(p);if(r?.requestId!==t.requestId||r?.visitId!==t.visitId||!['completed','not_found'].includes(r.state))throw Error('原病历核实目标不一致。');if(r.state==='completed'&&(!uuid(r.resultId)||!uuid(r.revisionId)||r.version!==p.body.recordVersion+1||!Number.isFinite(Date.parse(r.completedAt))))throw Error('原病历核实结果不完整。');return r;}
+export function validRecordSaved(p:any,r:any){const t=recordPendingTarget(p);if(!uuid(r?.id)||r.visitId?.toLowerCase()!==t.visitId||r.recordVersion!==p.body.recordVersion+1)throw Error('原病历保存回复不完整，请先只读核实。');}
+export function sameRecordPending(a:any,b:any){return a?.path===b?.path&&JSON.stringify(a?.body)===JSON.stringify(b?.body);}

@@ -1,0 +1,2 @@
+import{BadRequestException}from'@nestjs/common';import{uuidInput}from'./domain';
+export function qualificationPreparationStatusQuery(q:Record<string,unknown>){if(Object.keys(q).some(k=>!['qualificationId','draftId'].includes(k))||!Object.hasOwn(q,'qualificationId'))throw new BadRequestException('附件原准备核实条件无效。');return{qualificationId:q.qualificationId==='new'?null:uuidInput(q.qualificationId).toLowerCase(),draftId:uuidInput(q.draftId).toLowerCase()};}

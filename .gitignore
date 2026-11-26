@@ -1,4 +1,4 @@
-# Do not add personal/source materials or local runtime files.
+# Keep private materials and local runtime files outside version control.
 .env
 .env.*
 !.env.example
@@ -16,6 +16,9 @@ Thumbs.db
 .idea/
 __pycache__/
 node_modules/
+dist/
+.runtime/
+.tools/
 .venv/
 venv/
 tmp/

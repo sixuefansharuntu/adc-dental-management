@@ -1,0 +1,8 @@
+const uuid=(v:any)=>typeof v==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(v);
+export function isBillPending(p:any){return typeof p?.path==='string'&&/^\/visits\/[^/]+\/bill$/.test(p.path);}
+export function billPendingTarget(p:any){const m=p?.path?.match(/^\/visits\/([a-f0-9-]{36})\/bill$/i);if(!m||!uuid(m[1])||!uuid(p.body?.requestId)||!Number.isSafeInteger(p.body.billVersion)||p.body.billVersion<0||p.body.billId!==null&&!uuid(p.body.billId)||p.body.billId===null&&p.body.billVersion!==0||p.body.billId!==null&&p.body.billVersion<1)throw Error('原账单请求目标无效，请保留原记录。');return{requestId:p.body.requestId.toLowerCase(),visitId:m[1].toLowerCase()};}
+export function validBillStatus(p:any,r:any){const t=billPendingTarget(p);if(r?.requestId!==t.requestId||r?.visitId!==t.visitId||!['completed','not_found'].includes(r.state))throw Error('原账单核实目标不一致。');if(r.state==='completed'&&(!uuid(r.resultId)||!uuid(r.revisionId)||r.version!==p.body.billVersion+1||!Number.isFinite(Date.parse(r.completedAt))||p.body.billId&&r.resultId.toLowerCase()!==p.body.billId.toLowerCase()))throw Error('原账单核实结果不完整。');return r;}
+export function validBillSaved(p:any,r:any){const t=billPendingTarget(p);if(!uuid(r?.id)||r.visitId?.toLowerCase()!==t.visitId||(r.existing!==true&&r.version!==p.body.billVersion+1||!Number.isSafeInteger(r.version)||r.version<1||p.body.billId&&r.id.toLowerCase()!==p.body.billId.toLowerCase()))throw Error('原账单保存回复不完整，请先只读核实。');}
+export function sameBillPending(a:any,b:any){return a?.path===b?.path&&JSON.stringify(a?.body)===JSON.stringify(b?.body);}
+
+export{keepBillCache,clearBillCache}from'./clinical-bill-command';

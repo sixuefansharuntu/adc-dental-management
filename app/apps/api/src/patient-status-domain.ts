@@ -1,0 +1,2 @@
+import{BadRequestException}from'@nestjs/common';import{uuidInput}from'./domain';
+export function patientStatusQuery(q:Record<string,unknown>){if(Object.keys(q).some(k=>!['clinicId','patientId','branch'].includes(k))||typeof q.branch!=='string'||!['identity','source','contact','health','tags'].includes(q.branch))throw new BadRequestException('原档案核实条件无效。');return{clinicId:uuidInput(q.clinicId).toLowerCase(),patientId:uuidInput(q.patientId).toLowerCase(),branch:q.branch};}

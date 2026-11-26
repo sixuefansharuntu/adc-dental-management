@@ -1,0 +1,36 @@
+{
+  "name": "adc-dental-management",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ADC 教师演示站的网页、API 和本地合成环境",
+  "workspaces": [
+    "apps/api",
+    "apps/admin"
+  ],
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "build": "npm run build --workspace @adc/api && npm run build --workspace @adc/admin",
+    "dev": "node scripts/dev.mjs",
+    "dev:check": "node scripts/dev.mjs --check",
+    "db:init": "node scripts/initialize.mjs --confirm-synthetic",
+    "db:start": "node scripts/database.mjs start",
+    "db:stop": "node scripts/database.mjs stop",
+    "db:migrate": "node scripts/migrate.mjs"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "pg": "^8.16.3"
+  },
+  "overrides": {
+    "multer": "2.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.15.5",
+    "embedded-postgres": "17.5.0-beta.15",
+    "tsx": "^4.20.6",
+    "typescript": "5.9.3"
+  }
+}

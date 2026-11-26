@@ -1,0 +1,93 @@
+.booking-app {
+  --b-green: #0f3d2e;
+  --b-ink: #162921;
+  --b-muted: #53685e;
+  --adc-line: #dce7df;
+  --adc-soft: #e6f0e8;
+  background: #f4f7f4;
+  font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+}
+
+.booking-app :is(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid #377853;
+  outline-offset: 2px;
+}
+
+.booking-app .b-button:not(.outline):not(:disabled) { background: var(--b-green); color: white; }
+.booking-app .b-button.outline { border-color: #adbeaf; color: var(--b-green); }
+.booking-app .b-brand { color: var(--b-green); }
+.booking-app .b-sidebar { overflow: auto; scrollbar-width: thin; }
+.booking-app .b-sidebar nav button.current { background: var(--adc-soft); color: var(--b-green); }
+.booking-app .b-sidebar nav .b-settings-link { border-top: 1px solid var(--adc-line); margin-top: 14px; }
+.booking-app .b-mobile-nav-toggle { display: none; }
+
+.patient-app .b-patient-intro {
+  position: relative;
+  isolation: isolate;
+  padding: 29px 100px 29px 30px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--b-green);
+  color: white;
+}
+.patient-app .b-patient-intro h1 { color: inherit; margin: 0; letter-spacing: -.03em; }
+.patient-app .b-patient-intro p { color: #d4e6da; margin: 8px 0 0; }
+.patient-app .b-patient-intro .b-intro-mark {
+  position: absolute;
+  top: 50%;
+  right: 30px;
+  transform: translateY(-50%);
+  color: #97bfa5;
+}
+.patient-app .b-tabs { gap: 26px; margin: 15px 0 20px; }
+.patient-app .b-tabs button { color: var(--b-muted); min-height: 44px; padding: 8px 3px; }
+.patient-app .b-tabs button.active { color: var(--b-green); border-color: var(--b-green); }
+.patient-app .b-book-grid { grid-template-columns: minmax(240px, 292px) minmax(0, 1fr); }
+.patient-app .b-panel-title { font-size: 18px; line-height: 1.4; margin: 0 0 15px; color: var(--b-ink); }
+.patient-app .b-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.patient-app .b-panel-heading .b-panel-title { margin: 0; }
+.patient-app .b-refresh-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 9px; background: var(--adc-soft); color: var(--b-green); }
+.patient-app .b-card { border-color: var(--adc-line); box-shadow: 0 3px 15px #0f3d2e08; }
+.patient-app :is(.b-days, .b-doctor-list) button.chosen { background: var(--adc-soft); border-color: #719d7d; color: var(--b-green); }
+.patient-app .b-days :is(small,strong) { color: var(--b-muted); }
+.patient-app .b-days strong { color: var(--b-green); font-variant-numeric: tabular-nums; }
+.patient-app .b-slots button { min-height: 56px; color: var(--b-green); border-color: #aac7b3; background: #f4faf4; padding: 8px 4px; }
+.patient-app .b-slots button.unavailable { color: var(--b-muted); border-color: var(--adc-line); background: #eff2ef; }
+.patient-app .b-slots button :is(strong,span) { color: inherit; font-variant-numeric: tabular-nums; }
+.patient-app .b-slots button:not(:disabled):hover { background: var(--adc-soft); }
+.patient-app .b-appointment { border-left: 3px solid #9ab9a4; }
+.patient-app .b-summary { background: var(--adc-soft); border-color: var(--adc-line); }
+.booking-app .b-dialog { max-width: calc(100vw - 24px); max-height: calc(100dvh - 28px); overflow: auto; }
+
+@media (max-width: 760px) {
+  .booking-app .b-top { height: auto; min-height: 64px; flex-wrap: wrap; gap: 6px 12px; padding: 9px 14px; }
+  .booking-app .b-top-actions { flex-wrap: wrap; gap: 4px 12px; }
+  .booking-app .b-mobile-nav-toggle { display: inline-flex; min-height: 40px; }
+  .booking-app .b-sidebar.mobile-open {
+    display: flex;
+    position: static;
+    width: 100%;
+    max-height: 52dvh;
+    padding: 12px 14px;
+    border: 0;
+    border-bottom: 1px solid var(--adc-line);
+  }
+  .booking-app .b-sidebar.mobile-open > :not(nav) { display: none; }
+  .booking-app .b-sidebar.mobile-open nav { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 4px 8px; }
+  .booking-app .b-sidebar.mobile-open .b-nav-label { grid-column: 1 / -1; }
+  .booking-app .b-sidebar.mobile-open nav button { margin: 0; min-height: 44px; padding: 8px; }
+  .patient-app .b-body { padding: 14px 14px 0; }
+  .patient-app .b-patient-intro { padding: 21px 66px 21px 18px; border-radius: 14px; }
+  .patient-app .b-patient-intro .b-intro-mark { right: 16px; }
+  .patient-app .b-intro-mark svg { width: 34px; height: 34px; }
+  .patient-app .b-book-grid { grid-template-columns: minmax(0,1fr); gap: 12px; }
+  .patient-app :is(.b-filters,.b-time-panel) { padding: 15px; }
+  .patient-app .b-days { grid-template-columns: repeat(7,minmax(0,1fr)); gap: 4px; margin-bottom: 12px; }
+  .patient-app .b-days button { min-width: 0; padding: 5px 1px; min-height: 48px; }
+  .patient-app .b-days strong { margin: 3px 0; font-size: 17px; }
+  .patient-app .b-slots { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .patient-app .b-date-row { flex-wrap: wrap; gap: 6px 10px; }
+  .patient-app .m-overview { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+  .patient-app .b-appointment-actions { flex-wrap: wrap; }
+}
+

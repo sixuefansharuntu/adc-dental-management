@@ -1,0 +1,34 @@
+/* Readable sizes for the Chinese desktop workspace and patient preview. */
+.workspace-label,.nav-section{font-size:11px}
+.breadcrumb,.account-button{font-size:12px}
+.connection{font-size:11px}
+.eyebrow{font-size:10px}
+.page-heading p{font-size:13px}
+.scope-banner{font-size:11px}
+.scope-tag{font-size:10px}
+.metric-label{font-size:12px}
+.metric-foot{font-size:10px}
+.panel-heading h2{font-size:16px}
+.panel-heading>div>span{font-size:11px}
+.filter-row label,.filter-row select{font-size:12px}
+.filter-row select{max-width:225px}
+.day-button span{font-size:11px}
+.day-button strong{font-size:17px}
+.table-caption strong{font-size:12px}
+.table-caption>span{font-size:10px}
+.schedule-table{min-width:550px}
+.schedule-table th{font-size:11px}
+.doctor-cell strong{font-size:13px}
+.doctor-cell div>span,.cell-sub{font-size:10px}
+.time-range{font-size:12px}
+.status-badge,.text-button{font-size:11px}
+.version,.panel-footer,.page-footer,.live-tag{font-size:10px}
+.patient-selector,.patient-selector select,.patient-selector input{font-size:11px}
+.patient-date strong{font-size:11px}
+.patient-date>span,.slot-legend{font-size:10px}
+.slot span{font-size:13px}
+.slot small,.patient-note,.patient-submit{font-size:10px}
+.patient-disclaimer{font-size:9px}
+.patient-brand{font-size:12px}
+.patient-hero>span:last-of-type{font-size:10px}
+@media(max-width:650px){.connection{font-size:0}.filter-row select{max-width:none}}

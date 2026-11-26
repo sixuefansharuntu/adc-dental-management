@@ -1,0 +1,5 @@
+import {BadRequestException} from '@nestjs/common';
+import {objectInput,textInput,instantInput,versionInput} from './booking-domain';
+import {uuidInput} from './domain';
+export function adjustmentIds(value:unknown):string[]{if(value==null)return[];if(!Array.isArray(value)||value.length>2)throw new BadRequestException('请逐季选择原、新到账期间的调整轮次。');const ids=value.map(uuidInput);if(new Set(ids).size!==ids.length)throw new BadRequestException('调整轮次不得重复。');return ids;}
+export function receiptCorrection(value:unknown){const b=objectInput(value,['requestId','version','receivedAt','paymentMethod','basis','reason','actualConfirmed','adjustmentIds']);if(typeof b.paymentMethod!=='string'||!['cash','card','bank','wechat','alipay','other'].includes(b.paymentMethod))throw new BadRequestException('请选择经核实的付款方式。');if(b.actualConfirmed!==true)throw new BadRequestException('请明确核实实际收款事实及本次更正。');return{requestId:uuidInput(b.requestId),version:versionInput(b.version),receivedAt:instantInput(b.receivedAt),paymentMethod:b.paymentMethod,basis:textInput(b.basis,'实际收款核实依据',1500),reason:textInput(b.reason,'本次更正原因',1500),actualConfirmed:true,adjustmentIds:adjustmentIds(b.adjustmentIds)};}

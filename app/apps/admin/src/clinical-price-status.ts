@@ -1,0 +1,7 @@
+const uuid=(v:any)=>typeof v==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(v);
+export function isPricePending(p:any){return p?.path==='/prices';}
+export function pricePendingTarget(p:any){if(!isPricePending(p)||!uuid(p.body?.requestId)||!uuid(p.body.clinicId)||!uuid(p.body.itemId))throw Error('原调价请求目标无效，请保留原记录。');return{requestId:p.body.requestId.toLowerCase(),clinicId:p.body.clinicId.toLowerCase(),itemId:p.body.itemId.toLowerCase()};}
+export function validPriceStatus(p:any,r:any){const t=pricePendingTarget(p);if(r?.requestId!==t.requestId||r?.clinicId!==t.clinicId||r?.itemId!==t.itemId||!['completed','not_found'].includes(r.state))throw Error('原调价核实目标不一致。');if(r.state==='completed'&&(!uuid(r.resultId)||!Number.isSafeInteger(r.version)||r.version<1||!Number.isFinite(Date.parse(r.completedAt))))throw Error('原调价核实结果不完整。');return r;}
+export function validPriceSaved(p:any,r:any){const t=pricePendingTarget(p);if(!uuid(r?.id)||r.clinicId?.toLowerCase()!==t.clinicId||r.itemId?.toLowerCase()!==t.itemId||!Number.isSafeInteger(r.version)||r.version<1||!Number.isFinite(Date.parse(r.effectiveFrom))||Date.parse(r.effectiveFrom)!==Date.parse(p.body.effectiveFrom))throw Error('原调价保存回复不完整，请先只读核实。');}
+export function samePricePending(a:any,b:any){return a?.path===b?.path&&JSON.stringify(a?.body)===JSON.stringify(b?.body);}
+export{keepPriceCache,clearPriceCache}from'./clinical-price-command';
