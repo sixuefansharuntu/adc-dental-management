@@ -1,0 +1,245 @@
+{
+  "name": "adc-teacher-demo",
+  "services": {
+    "postgres": {
+      "image": "postgres:17",
+      "restart": "unless-stopped",
+      "environment": {
+        "POSTGRES_USER": "postgres",
+        "POSTGRES_DB": "postgres",
+        "POSTGRES_PASSWORD_FILE": "/run/secrets/db_owner_password"
+      },
+      "secrets": [
+        "db_owner_password"
+      ],
+      "volumes": [
+        "database:/var/lib/postgresql/data"
+      ],
+      "networks": [
+        "database"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "pg_isready -U postgres -d postgres"
+        ],
+        "interval": "5s",
+        "timeout": "3s",
+        "retries": 12
+      },
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+    },
+    "api": {
+      "image": "adc-teacher-api:local",
+      "build": {
+        "context": "..",
+        "dockerfile": "deploy/Dockerfile.api"
+      },
+      "restart": "unless-stopped",
+      "init": true,
+      "environment": {
+        "NODE_ENV": "production",
+        "PGHOST": "postgres",
+        "PGPORT": "5432",
+        "PGUSER": "adc_runtime",
+        "PGDATABASE": "adc_course_demo",
+        "PGPASSWORD_FILE": "/run/secrets/db_runtime_password",
+        "PUBLIC_HOST": "${PUBLIC_HOST:?Set HTTPS host}",
+        "ADMIN_ORIGIN": "https://${PUBLIC_HOST:?Set HTTPS host}",
+        "ADC_LOCAL_IDENTITY_ENABLED": "false",
+        "ADC_MINIPROGRAM_LOCAL_ENABLED": "false",
+        "ADC_FILE_ROOT": "/data/private-files",
+        "API_HOST": "0.0.0.0",
+        "API_PORT": "3100",
+        "ADC_TRUSTED_PROXY_IP": "172.30.44.2",
+        "ADC_DEPLOYMENT_PURPOSE": "teacher-demo",
+        "ADC_COURSE_DEMO_ENABLED": "true",
+        "ADC_COURSE_REGISTRATION_ENABLED": "${ADC_COURSE_REGISTRATION_ENABLED:-false}",
+        "ADC_COURSE_LOGIN_PUBLIC": "${ADC_COURSE_LOGIN_PUBLIC:-false}",
+        "ADC_COURSE_LOGIN_INVITE_HASH": "${ADC_COURSE_LOGIN_INVITE_HASH:-}",
+        "ADC_COURSE_LOGIN_INVITE_UNTIL": "${ADC_COURSE_LOGIN_INVITE_UNTIL:-}",
+        "ADC_COURSE_DEMO_MANIFEST_FILE": "/run/secrets/course_demo_manifest",
+        "ADC_MP_SOURCE_SECRET": "${ADC_MP_SOURCE_SECRET:-}"
+      },
+      "secrets": [
+        "db_runtime_password",
+        "course_demo_manifest"
+      ],
+      "volumes": [
+        "private_files:/data/private-files"
+      ],
+      "networks": {
+        "database": {},
+        "frontend": {
+          "ipv4_address": "172.30.44.3"
+        }
+      },
+      "depends_on": {
+        "postgres": {
+          "condition": "service_healthy"
+        }
+      },
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3100/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+        ],
+        "interval": "15s",
+        "timeout": "6s",
+        "retries": 4,
+        "start_period": "20s"
+      },
+      "stop_grace_period": "30s",
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+    },
+    "web": {
+      "build": {
+        "context": "..",
+        "dockerfile": "deploy/Dockerfile.web"
+      },
+      "restart": "unless-stopped",
+      "environment": {
+        "PUBLIC_HOST": "${PUBLIC_HOST:?Set HTTPS host}"
+      },
+      "ports": [
+        "80:80",
+        "443:443"
+      ],
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "${TLS_DIRECTORY:?Set certificate directory}",
+          "target": "/etc/nginx/certs",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        },
+        {
+          "type": "bind",
+          "source": "${ACME_DIRECTORY:?Set challenge directory}",
+          "target": "/var/www/acme",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        }
+      ],
+      "networks": {
+        "frontend": {
+          "ipv4_address": "172.30.44.2"
+        }
+      },
+      "depends_on": {
+        "api": {
+          "condition": "service_healthy"
+        }
+      },
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      },
+      "image": "adc-teacher-web:local"
+    },
+    "backup": {
+      "profiles": [
+        "tools"
+      ],
+      "user": "0:0",
+      "command": [
+        "list"
+      ],
+      "environment": {
+        "NODE_ENV": "production",
+        "PGHOST": "postgres",
+        "PGPORT": "5432",
+        "PGUSER": "postgres",
+        "PGDATABASE": "adc_course_demo",
+        "PGPASSWORD_FILE": "/run/secrets/db_owner_password",
+        "PUBLIC_HOST": "${PUBLIC_HOST:?Set HTTPS host}",
+        "ADMIN_ORIGIN": "https://${PUBLIC_HOST:?Set HTTPS host}",
+        "ADC_LOCAL_IDENTITY_ENABLED": "false",
+        "ADC_MINIPROGRAM_LOCAL_ENABLED": "false",
+        "ADC_DEPLOYMENT_PURPOSE": "teacher-demo",
+        "ADC_COURSE_DEMO_ENABLED": "true"
+      },
+      "secrets": [
+        "db_owner_password"
+      ],
+      "networks": [
+        "database"
+      ],
+      "depends_on": {
+        "postgres": {
+          "condition": "service_healthy"
+        }
+      },
+      "build": {
+        "context": "..",
+        "dockerfile": "deploy/Dockerfile.backup"
+      },
+      "entrypoint": [
+        "node",
+        "deploy/backup-server.mjs"
+      ],
+      "volumes": [
+        "private_files:/data/private-files:ro",
+        {
+          "type": "bind",
+          "source": "${BACKUP_DIRECTORY:?Set private backup directory}",
+          "target": "/backups",
+          "bind": {
+            "create_host_path": false
+          }
+        }
+      ],
+      "image": "adc-teacher-backup:local"
+    }
+  },
+  "secrets": {
+    "db_owner_password": {
+      "file": "${SECRETS_DIRECTORY:?Set private secret directory}/db_owner_password"
+    },
+    "db_runtime_password": {
+      "file": "${SECRETS_DIRECTORY:?Set private secret directory}/db_runtime_password"
+    },
+    "course_demo_manifest": {
+      "file": "${COURSE_DEMO_DIRECTORY:?Set private teacher output directory}/environment/course-demo.json"
+    }
+  },
+  "volumes": {
+    "database": {},
+    "private_files": {}
+  },
+  "networks": {
+    "database": {
+      "internal": true
+    },
+    "frontend": {
+      "ipam": {
+        "config": [
+          {
+            "subnet": "172.30.44.0/28"
+          }
+        ]
+      }
+    }
+  }
+}

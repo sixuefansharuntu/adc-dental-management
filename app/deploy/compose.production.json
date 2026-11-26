@@ -1,0 +1,345 @@
+{
+  "name": "adc-server",
+  "services": {
+    "postgres": {
+      "image": "postgres:17",
+      "restart": "unless-stopped",
+      "environment": {
+        "POSTGRES_USER": "postgres",
+        "POSTGRES_DB": "adc_server",
+        "POSTGRES_PASSWORD_FILE": "/run/secrets/db_owner_password"
+      },
+      "secrets": [
+        "db_owner_password"
+      ],
+      "volumes": [
+        "database:/var/lib/postgresql/data"
+      ],
+      "networks": [
+        "database"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "pg_isready -U postgres -d adc_server"
+        ],
+        "interval": "5s",
+        "timeout": "3s",
+        "retries": 12
+      },
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+    },
+    "api": {
+      "image": "adc-api:local",
+      "build": {
+        "context": "..",
+        "dockerfile": "deploy/Dockerfile.api"
+      },
+      "restart": "unless-stopped",
+      "init": true,
+      "environment": {
+        "NODE_ENV": "production",
+        "PGHOST": "postgres",
+        "PGPORT": "5432",
+        "PGUSER": "adc_runtime",
+        "PGDATABASE": "adc_server",
+        "PGPASSWORD_FILE": "/run/secrets/db_runtime_password",
+        "PUBLIC_HOST": "${PUBLIC_HOST:?Set actual domain}",
+        "ADMIN_ORIGIN": "https://${PUBLIC_HOST:?Set actual domain}",
+        "ADC_LOCAL_IDENTITY_ENABLED": "false",
+        "ADC_MINIPROGRAM_LOCAL_ENABLED": "false",
+        "ADC_FILE_ROOT": "/data/private-files",
+        "API_HOST": "0.0.0.0",
+        "API_PORT": "3100",
+        "ADC_TRUSTED_PROXY_IP": "172.30.44.2",
+        "ADC_MP_SOURCE_SECRET": "${ADC_MP_SOURCE_SECRET:-}"
+      },
+      "secrets": [
+        "db_runtime_password"
+      ],
+      "volumes": [
+        "private_files:/data/private-files"
+      ],
+      "networks": {
+        "database": {},
+        "frontend": {
+          "ipv4_address": "172.30.44.3"
+        }
+      },
+      "depends_on": {
+        "postgres": {
+          "condition": "service_healthy"
+        }
+      },
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3100/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+        ],
+        "interval": "15s",
+        "timeout": "6s",
+        "retries": 4,
+        "start_period": "20s"
+      },
+      "stop_grace_period": "30s",
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+    },
+    "web": {
+      "build": {
+        "context": "..",
+        "dockerfile": "deploy/Dockerfile.web"
+      },
+      "restart": "unless-stopped",
+      "environment": {
+        "PUBLIC_HOST": "${PUBLIC_HOST:?Set actual domain}"
+      },
+      "ports": [
+        "80:80",
+        "443:443"
+      ],
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "${TLS_DIRECTORY:?Set certificate directory}",
+          "target": "/etc/nginx/certs",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        }
+      ],
+      "networks": {
+        "frontend": {
+          "ipv4_address": "172.30.44.2"
+        }
+      },
+      "depends_on": {
+        "api": {
+          "condition": "service_healthy"
+        }
+      },
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+    },
+    "migrate": {
+      "profiles": [
+        "tools"
+      ],
+      "image": "adc-api:local",
+      "user": "0:0",
+      "command": [
+        "node",
+        "deploy/migrate.mjs",
+        "--apply"
+      ],
+      "environment": {
+        "NODE_ENV": "production",
+        "PGHOST": "postgres",
+        "PGPORT": "5432",
+        "PGUSER": "postgres",
+        "PGDATABASE": "adc_server",
+        "PGPASSWORD_FILE": "/run/secrets/db_owner_password",
+        "PUBLIC_HOST": "${PUBLIC_HOST:?Set actual domain}",
+        "ADMIN_ORIGIN": "https://${PUBLIC_HOST:?Set actual domain}",
+        "ADC_LOCAL_IDENTITY_ENABLED": "false",
+        "ADC_MINIPROGRAM_LOCAL_ENABLED": "false"
+      },
+      "secrets": [
+        "db_owner_password",
+        "db_runtime_password"
+      ],
+      "networks": [
+        "database"
+      ],
+      "depends_on": {
+        "postgres": {
+          "condition": "service_healthy"
+        }
+      }
+    },
+    "bootstrap": {
+      "profiles": [
+        "tools"
+      ],
+      "image": "adc-api:local",
+      "user": "0:0",
+      "command": [
+        "node",
+        "deploy/bootstrap.mjs",
+        "--check"
+      ],
+      "environment": {
+        "NODE_ENV": "production",
+        "PGHOST": "postgres",
+        "PGPORT": "5432",
+        "PGUSER": "postgres",
+        "PGDATABASE": "adc_server",
+        "PGPASSWORD_FILE": "/run/secrets/db_owner_password",
+        "PUBLIC_HOST": "${PUBLIC_HOST:?Set actual domain}",
+        "ADMIN_ORIGIN": "https://${PUBLIC_HOST:?Set actual domain}",
+        "ADC_LOCAL_IDENTITY_ENABLED": "false",
+        "ADC_MINIPROGRAM_LOCAL_ENABLED": "false"
+      },
+      "secrets": [
+        "db_owner_password",
+        "db_runtime_password",
+        "bootstrap_manifest",
+        "bootstrap_admin_password"
+      ],
+      "networks": [
+        "database"
+      ],
+      "depends_on": {
+        "postgres": {
+          "condition": "service_healthy"
+        }
+      }
+    },
+    "onboard": {
+      "profiles": [
+        "tools"
+      ],
+      "image": "adc-api:local",
+      "user": "0:0",
+      "command": [
+        "node",
+        "deploy/staff-onboard.mjs",
+        "--check"
+      ],
+      "environment": {
+        "NODE_ENV": "production",
+        "PGHOST": "postgres",
+        "PGPORT": "5432",
+        "PGUSER": "postgres",
+        "PGDATABASE": "adc_server",
+        "PGPASSWORD_FILE": "/run/secrets/db_owner_password",
+        "PUBLIC_HOST": "${PUBLIC_HOST:?Set actual domain}",
+        "ADMIN_ORIGIN": "https://${PUBLIC_HOST:?Set actual domain}",
+        "ADC_LOCAL_IDENTITY_ENABLED": "false",
+        "ADC_MINIPROGRAM_LOCAL_ENABLED": "false"
+      },
+      "secrets": [
+        "db_owner_password",
+        "db_runtime_password",
+        "staff_manifest",
+        "staff_passwords"
+      ],
+      "networks": [
+        "database"
+      ],
+      "depends_on": {
+        "postgres": {
+          "condition": "service_healthy"
+        }
+      }
+    },
+    "backup": {
+      "profiles": [
+        "tools"
+      ],
+      "user": "0:0",
+      "command": [
+        "list"
+      ],
+      "environment": {
+        "NODE_ENV": "production",
+        "PGHOST": "postgres",
+        "PGPORT": "5432",
+        "PGUSER": "postgres",
+        "PGDATABASE": "adc_server",
+        "PGPASSWORD_FILE": "/run/secrets/db_owner_password",
+        "PUBLIC_HOST": "${PUBLIC_HOST:?Set actual domain}",
+        "ADMIN_ORIGIN": "https://${PUBLIC_HOST:?Set actual domain}",
+        "ADC_LOCAL_IDENTITY_ENABLED": "false",
+        "ADC_MINIPROGRAM_LOCAL_ENABLED": "false"
+      },
+      "secrets": [
+        "db_owner_password"
+      ],
+      "networks": [
+        "database"
+      ],
+      "depends_on": {
+        "postgres": {
+          "condition": "service_healthy"
+        }
+      },
+      "build": {
+        "context": "..",
+        "dockerfile": "deploy/Dockerfile.backup"
+      },
+      "entrypoint": [
+        "node",
+        "deploy/backup-server.mjs"
+      ],
+      "volumes": [
+        "private_files:/data/private-files:ro",
+        {
+          "type": "bind",
+          "source": "${BACKUP_DIRECTORY:?Set private backup directory}",
+          "target": "/backups",
+          "bind": {
+            "create_host_path": false
+          }
+        }
+      ]
+    }
+  },
+  "secrets": {
+    "db_owner_password": {
+      "file": "${SECRETS_DIRECTORY:?Set private secret directory}/db_owner_password"
+    },
+    "db_runtime_password": {
+      "file": "${SECRETS_DIRECTORY:?Set private secret directory}/db_runtime_password"
+    },
+    "bootstrap_manifest": {
+      "file": "${SECRETS_DIRECTORY:?Set private secret directory}/bootstrap_manifest.json"
+    },
+    "bootstrap_admin_password": {
+      "file": "${SECRETS_DIRECTORY:?Set private secret directory}/bootstrap_admin_password"
+    },
+    "staff_manifest": {
+      "file": "${SECRETS_DIRECTORY:?Set private secret directory}/staff_manifest.json"
+    },
+    "staff_passwords": {
+      "file": "${SECRETS_DIRECTORY:?Set private secret directory}/staff_passwords.json"
+    }
+  },
+  "volumes": {
+    "database": {},
+    "private_files": {}
+  },
+  "networks": {
+    "database": {
+      "internal": true
+    },
+    "frontend": {
+      "ipam": {
+        "config": [
+          {
+            "subnet": "172.30.44.0/28"
+          }
+        ]
+      }
+    }
+  }
+}

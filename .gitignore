@@ -19,6 +19,7 @@ node_modules/
 dist/
 .runtime/
 .tools/
+project.private.config.json
 .venv/
 venv/
 tmp/

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": 1,
+  "requestId": "00000000-0000-4000-a000-000000000001",
+  "administratorAccountId": "00000000-0000-4000-a000-000000000002",
+  "administratorGrantId": "00000000-0000-4000-a000-000000000003",
+  "reason": "请填写开户及任职核对依据",
+  "employees": [
+    {"name":"请填写前台姓名","loginName":"front.initial","profile":"frontdesk","clinicIds":["00000000-0000-4000-a000-000000000004"],"from":"2026-11-13","to":null},
+    {"name":"请填写医生姓名","loginName":"doctor.initial","profile":"doctor","clinicIds":["00000000-0000-4000-a000-000000000004"],"from":"2026-11-13","to":null},
+    {"name":"请填写护士姓名","loginName":"nurse.initial","profile":"nurse","clinicIds":["00000000-0000-4000-a000-000000000004"],"from":"2026-11-13","to":null},
+    {"name":"请填写管理人员姓名","loginName":"manager.initial","profile":"clinic_manager","clinicIds":["00000000-0000-4000-a000-000000000004"],"from":"2026-11-13","to":null}
+  ]
+}

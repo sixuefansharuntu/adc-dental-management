@@ -1,0 +1,3 @@
+import test from'node:test';import assert from'node:assert/strict';import{dentistDirectoryQuery,dentistDirectoryBound}from'../apps/api/src/dentist-directory-domain';const id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+test('牙医目录条件严格，默认20并保留字面通配字符',()=>{assert.equal(dentistDirectoryQuery({clinicId:id,q:' %_ '} ).search,'%_');assert.equal(dentistDirectoryQuery({clinicId:id}).limit,20);for(const delta of[{clinicId:[id]},{q:['a']},{q:'a\n'},{q:'x'.repeat(101)},{limit:['20']},{limit:'0'},{limit:'51'},{cursor:''},{unknown:1}])assert.throws(()=>dentistDirectoryQuery({clinicId:id,...delta}));});
+test('牙医目录完整源大小超限明确拒绝，不截断',()=>{dentistDirectoryBound(['合法']);assert.throws(()=>dentistDirectoryBound('x'.repeat(5*1024*1024)));});

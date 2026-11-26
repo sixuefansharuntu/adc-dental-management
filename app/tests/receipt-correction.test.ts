@@ -1,0 +1,5 @@
+import test from'node:test';import assert from'node:assert/strict';import{randomUUID}from'node:crypto';import{adjustmentIds,receiptCorrection}from'../apps/api/src/receipt-domain';
+const base=()=>({requestId:randomUUID(),version:1,receivedAt:'2026-10-25T10:00:00+08:00',paymentMethod:'cash',basis:'核实合成收款事实',reason:'核对更正依据',actualConfirmed:true,adjustmentIds:[]});
+test('实收更正拒改金额、单据或首次登记身份字段',()=>{for(const key of['amount','billId','saleId','collectorId','registeredAt'])assert.throws(()=>receiptCorrection({...base(),[key]:'任意值'}));});
+test('实收更正须明确事实、依据与当前版本，统一实际时刻',()=>{assert.equal(receiptCorrection(base()).receivedAt,'2026-10-25T02:00:00.000Z');assert.throws(()=>receiptCorrection({...base(),actualConfirmed:false}));assert.throws(()=>receiptCorrection({...base(),reason:''}));assert.throws(()=>receiptCorrection({...base(),version:0}));});
+test('原新两季调整轮次须合法唯一，不接受任意超量或重复',()=>{const a=randomUUID(),b=randomUUID();assert.deepEqual(adjustmentIds([a,b]),[a,b]);assert.deepEqual(adjustmentIds(undefined),[]);assert.throws(()=>adjustmentIds([a,a]));assert.throws(()=>adjustmentIds([a,b,randomUUID()]));assert.throws(()=>adjustmentIds('任意轮次'));});

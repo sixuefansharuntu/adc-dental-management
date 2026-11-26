@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {passwordChangeInput} from '../apps/api/src/patient-password';
+import {currentCourseVerifier,demoDigest} from '../apps/api/src/course-demo';
+import {registrationInput} from '../apps/api/src/course-registration';
+import {randomUUID} from 'node:crypto';
+const binding={datasetId:randomUUID(),identityId:randomUUID(),subjectId:randomUUID(),loginName:'alice'},root=demoDigest('original');
+const change=(version:number,from:string,to:string)=>({...binding,schemaVersion:1,syntheticOnly:true,credentialVersion:version,fromVerifierSha256:from,toVerifierSha256:to});
+test('新患者密码8位即可，原密码空格保持，拒指定目标或弱口令',()=>{assert.deepEqual(passwordChangeInput({oldPassword:'  Old1234 ',newPassword:'New12345'}),{oldPassword:'  Old1234 ',newPassword:'New12345'});for(const p of[{oldPassword:'',newPassword:'New12345'},{oldPassword:'Old12345',newPassword:'short1'},{oldPassword:'Old12345',newPassword:'lettersOnly'},{oldPassword:'Old12345',newPassword:'12345678'},{oldPassword:'Old12345',newPassword:'Old12345'},{oldPassword:'Old12345',newPassword:'New12345',identityId:randomUUID()}])assert.throws(()=>passwordChangeInput(p));assert.equal(registrationInput({requestId:randomUUID(),loginName:'new_user',name:'合成患者',contact:'13800000312',syntheticOnly:true,password:'New12345'}).password,'New12345');});
+test('凭据链从原始清单推进，乱序审计按版本核验',()=>{const a=demoDigest('a'),b=demoDigest('b');assert.equal(currentCourseVerifier(root,[],binding),root);assert.equal(currentCourseVerifier(root,[change(2,a,b),change(1,root,a)],binding),b);});
+test('凭据链拒分叉、断链、回滚、越界和跨主体拼接',()=>{const a=demoDigest('a'),b=demoDigest('b');for(const p of[[change(1,root,a),change(1,root,b)],[change(2,root,a)],[change(1,b,a)],[{...change(1,root,a),subjectId:randomUUID()}],[{...change(1,root,a),syntheticOnly:false}],[{...change(1,root,a),credentialVersion:'1'}],[null],Array(501).fill(change(1,root,a))])assert.equal(currentCourseVerifier(root,p,binding),null);});

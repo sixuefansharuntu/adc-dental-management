@@ -1,0 +1,5 @@
+import test from'node:test';import assert from'node:assert/strict';import{qualityQueueQuery as queue,qualityHistoryQuery as history,qualityPageBound as bound}from'../apps/api/src/quality-page-domain';
+const id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',base={clinicId:id,year:'2026',quarter:'4'};
+test('资料问题分页严格单值范围，默认20、最大50、拒旧after',()=>{assert.equal(queue(base).limit,20);assert.equal(queue({...base,clinicId:id.toUpperCase(),limit:'50'}).clinicId,id);for(const q of[{...base,year:['2026','2026']},{...base,clinicId:[id]},{...base,quarter:'04'},{...base,limit:'0'},{...base,limit:'51'},{...base,cursor:[]},{...base,after:id},{...base,extra:1}])assert.throws(()=>queue(q));});
+test('资料历史分页核完整基准，拒多值及未知参数',()=>{assert.equal(history({}).limit,20);assert.equal(history({basis:'a'.repeat(64),cursor:'signed'}).cursor,'signed');for(const q of[{basis:'bad'},{basis:['a'.repeat(64)]},{beforeId:id},{limit:null},{limit:['20']},{cursor:''},{cursor:'x'.repeat(3001)}])assert.throws(()=>history(q));});
+test('资料完整分页来源5MiB边界明确拒绝，不截断',()=>{bound('x'.repeat(5*1024*1024-2));assert.throws(()=>bound('x'.repeat(5*1024*1024-1)));});

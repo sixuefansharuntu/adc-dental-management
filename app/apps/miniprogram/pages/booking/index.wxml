@@ -1,0 +1,81 @@
+<view class="container">
+  <view wx:if="{{phase === 'saved'}}" class="result">
+    <view class="result-mark" aria-hidden="true">✓</view>
+    <view class="title">{{changing ? '改约成功' : '预约成功'}}</view>
+    <view class="subtitle">就诊安排已确认。</view>
+    <view class="profile result-details">
+      <view wx:if="{{summary}}">
+        <view class="detail-time">{{summary.range}}</view>
+        <view class="body">{{summary.doctorName}} · {{summary.serviceName}}</view>
+        <view class="body">{{summary.clinicName}}</view>
+      </view>
+      <view class="note identifier">
+        <text>预约编号 </text><text selectable="{{true}}">{{result.id}}</text>
+      </view>
+    </view>
+    <view class="action-stack">
+      <navigator class="primary" url="/pages/appointments/index" open-type="switchTab">查看我的预约</navigator>
+      <navigator class="text-button" url="/pages/index/index" open-type="switchTab">返回预约首页</navigator>
+    </view>
+  </view>
+
+  <block wx:else>
+    <view class="page-heading">
+      <view class="title">{{changing ? '确认改约安排' : '确认就诊安排'}}</view>
+      <view class="subtitle">课程演示，请使用合成资料。</view>
+    </view>
+    <view wx:if="{{!enabled}}" class="notice">当前仅开放排班查询。</view>
+    <view wx:elif="{{phase === 'retired'}}" class="notice">
+      <view>原未执行提交已结束。可返回重新选择安排。</view>
+      <navigator class="text-button" url="/pages/index/index" open-type="switchTab">返回预约首页</navigator>
+    </view>
+    <block wx:elif="{{phase !== 'invalid'}}">
+      <view wx:if="{{quote || preview}}" class="profile booking-summary">
+        <view class="caption">{{quote ? '已核对的就诊时段' : '所选就诊时段'}} · 北京时间</view>
+        <view class="detail-time">{{quote ? quote.range : preview.range}}</view>
+        <view class="body">{{quote ? quote.doctorName : preview.doctorName}} · {{quote ? quote.serviceName : preview.serviceName}}</view>
+        <view class="body">{{quote ? quote.clinicName : preview.clinicName}}</view>
+        <view wx:if="{{quote ? quote.address : preview.address}}" class="note">{{quote ? quote.address : preview.address}}</view>
+      </view>
+
+      <view wx:if="{{!patient}}" class="profile">
+        <view class="section-title">患者登录</view>
+        <label class="form-label" for="patient-name">演示账号</label>
+        <input id="patient-name" class="entry" value="{{credentials.loginName}}" maxlength="100" data-field="loginName" bindinput="onInput" disabled="{{busy}}"/>
+        <label class="form-label" for="patient-password">密码</label>
+        <input id="patient-password" class="entry" password="{{true}}" value="{{credentials.password}}" maxlength="128" data-field="password" bindinput="onInput" disabled="{{busy}}"/>
+        <view class="action-stack"><button class="primary" bindtap="onLogin" disabled="{{busy}}" loading="{{busy}}">登录</button></view>
+      </view>
+      <view wx:elif="{{phase === 'unknown'}}" class="profile">
+        <view class="section-title">提交结果待确认</view>
+        <view class="body">请先核实这笔预约的结果。</view>
+        <view class="action-stack"><button class="primary" bindtap="onRecover" disabled="{{busy}}" loading="{{busy}}">查询原请求结果</button></view>
+        <view wx:if="{{retryAllowed}}">
+          <checkbox-group bindchange="onRetryConfirm">
+            <label class="confirmation"><checkbox value="yes" checked="{{retryConfirmed}}" disabled="{{busy}}" color="#195967"/>我确认重试这笔原请求</label>
+          </checkbox-group>
+          <button class="secondary" bindtap="onRetrySubmit" disabled="{{busy || !retryConfirmed}}">重试原请求</button>
+        </view>
+      </view>
+      <view wx:else class="profile">
+        <view class="section-title">就诊人信息</view>
+        <label class="form-label" for="visitor-name">姓名</label>
+        <input id="visitor-name" class="entry" value="{{form.name}}" maxlength="100" data-field="name" bindinput="onInput" disabled="{{busy}}"/>
+        <label class="form-label" for="visitor-contact">联系电话</label>
+        <input id="visitor-contact" class="entry" type="tel" value="{{form.contact}}" maxlength="40" data-field="contact" bindinput="onInput" disabled="{{busy}}"/>
+        <label class="form-label" for="visitor-intention">就诊意向</label>
+        <textarea id="visitor-intention" class="entry intention" value="{{form.intention}}" maxlength="500" placeholder="简述希望咨询的问题" data-field="intention" bindinput="onInput" disabled="{{busy}}"/>
+        <block wx:if="{{quote}}">
+          <checkbox-group bindchange="onConfirm">
+            <label class="confirmation"><checkbox value="yes" checked="{{confirmed}}" disabled="{{busy}}" color="#195967"/>我已核对就诊人和预约安排</label>
+          </checkbox-group>
+          <button class="primary" bindtap="onSubmit" disabled="{{busy || !confirmed}}" loading="{{busy}}">{{changing ? '确认改约' : '确认预约'}}</button>
+          <view class="note">提交时系统会再次检查时段是否可约。</view>
+        </block>
+        <view wx:else class="action-stack"><button class="primary" bindtap="onQuote" disabled="{{busy}}" loading="{{busy}}">核对就诊安排</button></view>
+      </view>
+      <button wx:if="{{patient && phase !== 'unknown'}}" class="text-button" bindtap="onLogout" disabled="{{busy}}">退出登录</button>
+    </block>
+    <view wx:if="{{error}}" class="error" aria-live="polite">{{error}}</view>
+  </block>
+</view>

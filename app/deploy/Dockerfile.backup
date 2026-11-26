@@ -1,0 +1,20 @@
+# Candidate only: native client and Node combination not yet built in Docker.
+FROM node:24-bookworm-slim AS dependencies
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/admin/package.json apps/admin/package.json
+RUN npm ci --omit=dev
+
+FROM postgres:17-bookworm
+# The PostgreSQL ICU runtime already includes libstdc++; avoid a redundant apt update.
+WORKDIR /app
+COPY --from=dependencies /usr/local/bin/node /usr/local/bin/node
+COPY --from=dependencies /app/node_modules ./node_modules
+COPY deploy ./deploy
+COPY scripts/config.mjs scripts/backup-local.mjs scripts/backup-domain.mjs ./scripts/
+COPY database/migrations ./database/migrations
+RUN node --version && /usr/lib/postgresql/17/bin/pg_dump --version
+ENV NODE_ENV=production
+ENTRYPOINT ["node","deploy/backup-server.mjs"]
+CMD ["list"]

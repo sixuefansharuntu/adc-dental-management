@@ -1,0 +1,80 @@
+<view class="container">
+  <view class="page-heading">
+    <view class="title">我的预约</view>
+  </view>
+  <view wx:if="{{!enabled}}" class="notice">当前仅开放排班查询。</view>
+  <view wx:elif="{{!patient}}" class="profile">
+    <view class="section-title">患者登录</view>
+    <label class="form-label" for="mine-name">演示账号</label>
+    <input id="mine-name" class="entry" value="{{loginName}}" data-field="loginName" bindinput="input" disabled="{{busy}}"/>
+    <label class="form-label" for="mine-password">密码</label>
+    <input id="mine-password" class="entry" password="{{true}}" value="{{password}}" data-field="password" bindinput="input" disabled="{{busy}}"/>
+    <view class="action-stack"><button class="primary" bindtap="login" disabled="{{busy}}" loading="{{busy}}">登录</button></view>
+  </view>
+  <block wx:else>
+    <view wx:if="{{otherPending}}" class="notice">
+      <view>有一笔预约或改约结果待确认。</view>
+      <button class="text-button" bindtap="continuePending">核实原请求</button>
+    </view>
+
+    <view wx:if="{{unknown}}" class="profile">
+      <view class="section-title">取消结果待确认</view>
+      <view class="action-stack"><button class="primary" bindtap="onRecover" disabled="{{busy}}" loading="{{busy}}">核实原取消结果</button></view>
+      <view wx:if="{{retryAllowed}}">
+        <checkbox-group bindchange="confirmRetry">
+          <label class="confirmation"><checkbox value="yes" checked="{{retryConfirmed}}" disabled="{{busy}}" color="#195967"/>我确认重试同一取消请求</label>
+        </checkbox-group>
+        <button class="secondary" bindtap="onRetry" disabled="{{busy || !retryConfirmed}}">重试原取消</button>
+      </view>
+    </view>
+    <view wx:elif="{{selected}}" id="cancel-appointment" class="profile">
+      <view class="section-title">确认取消预约</view>
+      <view class="body">{{selected.range}} · {{selected.doctorName}}</view>
+      <view class="body">{{selected.clinicName}} · {{selected.serviceName}}</view>
+      <label class="form-label" for="cancel-reason">取消原因</label>
+      <input id="cancel-reason" class="entry" value="{{reason}}" maxlength="500" data-field="reason" bindinput="input" disabled="{{busy}}"/>
+      <checkbox-group bindchange="confirm">
+        <label class="confirmation"><checkbox value="yes" checked="{{confirmed}}" disabled="{{busy}}" color="#195967"/>我确认取消本次预约</label>
+      </checkbox-group>
+      <button class="danger" bindtap="cancel" disabled="{{busy || !confirmed}}">确认取消</button>
+      <button class="text-button" bindtap="dismissCancel" disabled="{{busy}}">保留预约</button>
+    </view>
+
+    <view class="list-heading">
+      <view class="appointment-tabs">
+        <button class="{{view === 'upcoming' ? 'current' : ''}}" data-view="upcoming" bindtap="changeView" disabled="{{busy || !!selected}}">即将就诊</button>
+        <button class="{{view === 'history' ? 'current' : ''}}" data-view="history" bindtap="changeView" disabled="{{busy || !!selected}}">历史记录</button>
+      </view>
+      <button class="text-button" bindtap="refresh" disabled="{{busy || !!selected}}">刷新</button>
+    </view>
+    <view wx:if="{{busy && !rows.length}}" class="notice">正在加载预约…</view>
+    <view wx:elif="{{!rows.length && !error}}" class="notice">
+      <view>{{view === 'upcoming' ? '暂无即将就诊的预约。' : '暂无历史预约。'}}</view>
+      <navigator wx:if="{{view === 'upcoming'}}" class="text-button" url="/pages/index/index" open-type="switchTab">去预约</navigator>
+    </view>
+    <view wx:for="{{rows}}" wx:key="id" class="profile appointment">
+      <view class="appointment-heading"><text class="appointment-day">{{item.dayLabel}}</text><text class="appointment-status {{item.disposition !== 'active' ? 'past' : ''}}">{{item.statusLabel}}</text></view>
+      <view class="appointment-time">{{item.timeLabel}}</view>
+      <view class="caption">北京时间</view>
+      <view class="appointment-facts">
+        <view class="body">{{item.doctorName}} · {{item.serviceName}}</view>
+        <view class="body">{{item.clinicName}}</view>
+        <view wx:if="{{item.address}}" class="caption">{{item.address}}</view>
+        <view class="body">预约编号 <text selectable="{{true}}">{{item.shortId}}</text></view>
+      </view>
+      <view wx:if="{{detailId === item.id}}" class="appointment-details">
+        <view class="caption">完整预约编号</view>
+        <view class="identifier"><text selectable="{{true}}">{{item.id}}</text></view>
+        <view wx:if="{{item.cancelReason}}" class="body">取消原因 · {{item.cancelReason}}</view>
+      </view>
+      <view class="appointment-actions">
+        <button class="primary appointment-detail-button" data-id="{{item.id}}" bindtap="toggleDetail" disabled="{{busy}}">{{detailId === item.id ? '收起预约详情' : '查看预约详情'}}</button>
+        <button wx:if="{{item.canReschedule}}" class="secondary" data-id="{{item.id}}" bindtap="reschedule" disabled="{{busy || unknown || otherPending}}">改约</button>
+        <button wx:if="{{item.canCancel}}" class="text-button" data-id="{{item.id}}" bindtap="chooseCancel" disabled="{{busy || unknown || otherPending}}">取消预约</button>
+      </view>
+    </view>
+    <button wx:if="{{cursor}}" class="secondary more" bindtap="more" disabled="{{busy}}">加载更多</button>
+  </block>
+  <view wx:if="{{error}}" class="error" aria-live="polite">{{error}}</view>
+  <navigator wx:if="{{enabled}}" class="text-button recovery-link" url="/pages/recovery/index">核实提交结果</navigator>
+</view>

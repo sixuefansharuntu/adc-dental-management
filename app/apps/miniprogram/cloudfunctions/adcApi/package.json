@@ -1,0 +1,9 @@
+{
+  "name": "adcApi",
+  "version": "1.0.0",
+  "description": "ADC 患者端小程序 · 后端代理云函数",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

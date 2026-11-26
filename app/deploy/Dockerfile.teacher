@@ -1,0 +1,15 @@
+# One-shot teacher initializer; candidate image, not yet container-tested.
+FROM node:24-bookworm-slim
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/admin/package.json apps/admin/package.json
+RUN npm ci
+COPY tsconfig.json ./
+COPY scripts ./scripts
+COPY apps/api ./apps/api
+COPY database/migrations ./database/migrations
+COPY deploy ./deploy
+ENV NODE_ENV=production
+ENTRYPOINT ["node","--import","tsx","deploy/teacher-init.mts"]
+CMD ["--apply"]

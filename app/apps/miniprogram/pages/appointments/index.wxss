@@ -1,0 +1,16 @@
+.list-heading, .appointment-heading, .appointment-actions { display: flex; align-items: center; justify-content: space-between; gap: 14rpx; }
+.appointment-day { min-width: 0; font-weight: 700; font-size: 31rpx; overflow-wrap: anywhere; }
+.appointment { margin-top: 0; }
+.appointment-status { flex: none; padding: 5rpx 14rpx; border-radius: 40rpx; background: #e6f2f3; color: #174852; font-size: 25rpx; }
+.appointment-status.past { background: #edf0ef; color: #526866; }
+.appointment-time { margin-top: 6rpx; font-size: 50rpx; font-weight: 700; line-height: 1.24; font-variant-numeric: tabular-nums; }
+.appointment-actions { justify-content: flex-end; flex-wrap: wrap; margin-top: 18rpx; gap: 10rpx; }
+.appointment-actions button { padding-inline: 16rpx; }
+.appointment-detail-button { flex: 1 0 auto; }
+.appointment-facts, .appointment-details { border-top: 1rpx solid #d9e5e4; margin-top: 16rpx; padding-top: 9rpx; }
+.appointment-details { font-size: 28rpx; }
+.appointment-tabs { display:flex; gap: 24rpx; }
+.appointment-tabs button { min-height: 88rpx; border-bottom: 4rpx solid transparent; border-radius: 0; background: transparent; color: #4d6566; font-size: 28rpx; padding: 18rpx 2rpx; }
+.appointment-tabs .current { border-bottom-color: #195967; color: #174852; font-weight: 700; }
+.more { width: 100%; }
+.recovery-link { margin-top: 20rpx; }

@@ -1,0 +1,40 @@
+page {
+  background: #f8faf9;
+  color: #173b3d;
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 30rpx;
+  line-height: 1.55;
+}
+button { margin: 0; padding: 0; font-family: inherit; line-height: inherit; }
+button::after { border: 0; }
+.container { box-sizing: border-box; max-width: 920rpx; margin: 0 auto; padding: 28rpx 30rpx 56rpx; }
+.page-heading { margin: 12rpx 0 30rpx; }
+.title { font-size: 50rpx; font-weight: 650; line-height: 1.15; }
+.subtitle { margin-top: 12rpx; font-size: 28rpx; color: #4d6566; }
+.section-title { font-size: 36rpx; font-weight: 650; line-height: 1.3; }
+.profile { box-sizing: border-box; padding: 28rpx; margin: 22rpx 0; background: #fff; border: 1rpx solid #d9e5e4; border-radius: 22rpx; }
+.doctor { font-size: 34rpx; font-weight: 650; line-height: 1.3; }
+.body { color: #4d6566; font-size: 28rpx; margin-top: 10rpx; overflow-wrap: anywhere; }
+.caption, .note, .footer { color: #4d6566; font-size: 25rpx; }
+.note { margin-top: 16rpx; }
+.footer { margin-top: 32rpx; padding-top: 20rpx; border-top: 1rpx solid #d9e5e4; }
+.notice, .error { padding: 22rpx 24rpx; border-radius: 16rpx; margin: 20rpx 0; font-size: 28rpx; }
+.notice { background: #edf4f4; color: #35595b; }
+.error { background: #fff0e9; color: #853b26; }
+.primary, .secondary, .text-button, .danger {
+  box-sizing: border-box; display: flex; align-items: center; justify-content: center;
+  min-height: 88rpx; padding: 12rpx 24rpx; font-size: 28rpx; font-weight: 600; border-radius: 18rpx; text-align: center;
+}
+.primary { background: #195967; color: #fff; }
+.secondary { background: #edf5f5; color: #174852; }
+.text-button { background: transparent; color: #195967; padding-inline: 10rpx; }
+.danger { background: #fbece6; color: #853b26; }
+.primary[disabled], .secondary[disabled], .danger[disabled], .text-button[disabled] { background: #edf0ef; color: #5c6c6a; }
+.action-stack { display: flex; flex-direction: column; gap: 14rpx; margin-top: 24rpx; }
+.error .secondary { margin-top: 16rpx; }
+.form-label { display: block; margin: 18rpx 0 8rpx; color: #35595b; font-size: 27rpx; }
+.entry { box-sizing: border-box; display: block; width: 100%; min-height: 88rpx; padding: 16rpx 18rpx; border: 1rpx solid #d9e5e4; border-radius: 14rpx; background: #f8faf9; font-size: 30rpx; }
+.intention { height: 164rpx; }
+.confirmation { display: flex; align-items: flex-start; gap: 12rpx; padding: 20rpx 0; font-size: 28rpx; }
+.identifier { word-break: break-all; }
+.detail-time { font-size: 38rpx; font-weight: 650; line-height: 1.25; font-variant-numeric: tabular-nums; }

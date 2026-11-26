@@ -1,0 +1,102 @@
+{
+  "name": "adc-teacher-demo",
+  "services": {
+    "postgres": {
+      "image": "postgres:17",
+      "restart": "unless-stopped",
+      "environment": {
+        "POSTGRES_USER": "postgres",
+        "POSTGRES_DB": "postgres",
+        "POSTGRES_PASSWORD_FILE": "/run/secrets/db_owner_password"
+      },
+      "secrets": [
+        "db_owner_password"
+      ],
+      "volumes": [
+        "database:/var/lib/postgresql/data"
+      ],
+      "networks": [
+        "database"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "pg_isready -U postgres -d postgres"
+        ],
+        "interval": "5s",
+        "timeout": "3s",
+        "retries": 12
+      },
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+    },
+    "teacher-init": {
+      "profiles": [
+        "tools"
+      ],
+      "build": {
+        "context": "..",
+        "dockerfile": "deploy/Dockerfile.teacher"
+      },
+      "user": "0:0",
+      "environment": {
+        "NODE_ENV": "production",
+        "PGHOST": "postgres",
+        "PGPORT": "5432",
+        "PGUSER": "postgres",
+        "PGDATABASE": "adc_course_demo",
+        "PGPASSWORD_FILE": "/run/secrets/db_owner_password",
+        "PUBLIC_HOST": "${PUBLIC_HOST:?Set HTTPS host}",
+        "ADMIN_ORIGIN": "https://${PUBLIC_HOST:?Set HTTPS host}",
+        "ADC_LOCAL_IDENTITY_ENABLED": "false",
+        "ADC_MINIPROGRAM_LOCAL_ENABLED": "false",
+        "ADC_DEPLOYMENT_PURPOSE": "teacher-demo",
+        "ADC_COURSE_DEMO_ENABLED": "true"
+      },
+      "secrets": [
+        "db_owner_password",
+        "db_runtime_password"
+      ],
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "${COURSE_DEMO_DIRECTORY:?Set private teacher output directory}",
+          "target": "/output",
+          "bind": {
+            "create_host_path": false
+          }
+        }
+      ],
+      "networks": [
+        "database"
+      ],
+      "depends_on": {
+        "postgres": {
+          "condition": "service_healthy"
+        }
+      },
+      "image": "adc-teacher-init:local"
+    }
+  },
+  "secrets": {
+    "db_owner_password": {
+      "file": "${SECRETS_DIRECTORY:?Set private secret directory}/db_owner_password"
+    },
+    "db_runtime_password": {
+      "file": "${SECRETS_DIRECTORY:?Set private secret directory}/db_runtime_password"
+    }
+  },
+  "volumes": {
+    "database": {}
+  },
+  "networks": {
+    "database": {
+      "internal": true
+    }
+  }
+}

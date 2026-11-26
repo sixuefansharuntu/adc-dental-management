@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+.env
+.env.*
+.runtime
+.tools
+.git
+artifacts
+specs
+tests
+*.log

@@ -1,0 +1,33 @@
+<view class="container">
+  <view class="page-heading">
+    <view class="title">核实提交结果</view>
+    <view class="subtitle">查询之前提交的预约、改约或取消。</view>
+  </view>
+  <block wx:if="{{enabled}}">
+    <view wx:if="{{!verified}}" class="profile">
+      <view class="section-title">登录原患者账号</view>
+      <label class="form-label" for="recover-name">演示账号</label>
+      <input id="recover-name" class="entry" data-field="loginName" bindinput="input" value="{{loginName}}" disabled="{{busy}}"/>
+      <label class="form-label" for="recover-password">密码</label>
+      <input id="recover-password" class="entry" password="{{true}}" data-field="password" bindinput="input" value="{{password}}" disabled="{{busy}}"/>
+      <view class="action-stack"><button class="primary" bindtap="login" disabled="{{busy}}" loading="{{busy}}">登录</button></view>
+    </view>
+    <view wx:if="{{message}}" class="notice" aria-live="polite">{{message}}</view>
+    <view wx:if="{{verified && receipt}}" class="profile">
+      <button class="primary" bindtap="recover" disabled="{{busy}}" loading="{{busy}}">查询原请求结果</button>
+      <view wx:if="{{canRetire}}">
+        <checkbox-group bindchange="confirmRetire">
+          <label class="confirmation"><checkbox value="yes" checked="{{retireConfirmed}}" disabled="{{busy}}" color="#195967"/>确认结束未执行的提交，保留已有预约</label>
+        </checkbox-group>
+        <button class="danger" bindtap="retire" disabled="{{busy || !retireConfirmed}}">结束未执行提交</button>
+      </view>
+    </view>
+    <view wx:if="{{result}}" class="profile">
+      <view class="section-title">已找到结果</view>
+      <view class="body identifier">预约编号 <text selectable="{{true}}">{{result.id}}</text></view>
+      <view class="note">版本 {{result.version}}</view>
+      <navigator class="text-button" url="/pages/appointments/index" open-type="switchTab">查看我的预约</navigator>
+    </view>
+  </block>
+  <view wx:else class="notice">当前仅开放排班查询。</view>
+</view>

@@ -1,0 +1,92 @@
+<view class="container home {{selectedSlot ? 'with-dock' : ''}}">
+  <view class="home-nav">
+    <text class="brand">ADC 牙科</text>
+    <button wx:if="{{bookingEnabled}}" class="text-button" bindtap="onMine">我的预约</button>
+  </view>
+
+  <view wx:if="{{!changing}}" class="welcome">
+    <view class="welcome-copy">
+      <view class="title">预约看牙</view>
+      <view class="subtitle">查看医生和可约时间，在线确认就诊。</view>
+      <button class="primary welcome-action" bindtap="onScrollToBooking">查看可约时间</button>
+    </view>
+    <image class="welcome-photo" src="/assets/patient-welcome.jpg" mode="aspectFill"/>
+  </view>
+  <view wx:else class="notice change-notice">
+    <text>正在选择改约时段。改约成功前，原预约继续有效。</text>
+    <button class="text-button" bindtap="onNewBooking">退出改约</button>
+  </view>
+
+  <view id="booking" class="home-section">
+    <view class="section-title">选择就诊安排</view>
+    <view class="profile filters">
+      <picker class="choice-row" range="{{clinicNames}}" value="{{clinicIndex}}" disabled="{{!ready || !clinics.length}}" bindchange="onClinic">
+        <view class="choice-text"><text class="caption">诊所</text><text>{{clinicNames[clinicIndex] || '暂无诊所'}}  ›</text></view>
+      </picker>
+      <view wx:if="{{selected.address}}" class="address">{{selected.address}}</view>
+      <view class="doctor-field">
+        <view class="caption">医生</view>
+        <view wx:if="{{doctors.length}}" class="doctor-grid">
+          <button wx:for="{{doctors}}" wx:key="doctorId" class="doctor-option {{doctorIndex === index ? 'chosen' : ''}}" data-id="{{item.doctorId}}" bindtap="onDoctorChoice" aria-label="{{item.doctorName}} {{item.specialty}} {{doctorIndex === index ? '已选择' : ''}}">
+            <text>{{item.doctorName}}</text>
+            <text wx:if="{{item.specialty}}" class="doctor-specialty">{{item.specialty}}</text>
+          </button>
+        </view>
+        <view wx:else class="body">暂无医生</view>
+        <button wx:if="{{selected.introduction}}" class="text-button" bindtap="onToggleDoctor">{{showDoctor ? '收起医生介绍' : '医生介绍'}}</button>
+        <view wx:if="{{showDoctor}}" class="body">{{selected.introduction}}</view>
+      </view>
+      <picker class="choice-row" range="{{serviceNames}}" value="{{serviceIndex}}" disabled="{{!ready || !services.length}}" bindchange="onService">
+        <view class="choice-text"><text class="caption">预约服务</text><text>{{serviceNames[serviceIndex] || '暂无服务'}}  ›</text></view>
+      </picker>
+    </view>
+  </view>
+
+  <view class="home-section schedule">
+    <view class="section-heading">
+      <view class="section-title">选择就诊时间</view>
+      <button wx:if="{{date !== today}}" class="text-button" disabled="{{!ready}}" bindtap="onToday">回到今天</button>
+    </view>
+    <view class="days">
+      <button wx:for="{{days}}" wx:key="key" class="day {{item.key === date ? 'chosen' : ''}}" data-date="{{item.key}}" disabled="{{!ready || !selected}}" bindtap="onDayChoice" aria-label="{{item.key}} {{item.key === date ? '已选择' : ''}}">
+        <text>{{item.weekday}}</text><text class="day-number">{{item.day}}</text><text>{{item.label}}</text>
+      </button>
+    </view>
+    <view class="schedule-tools">
+      <picker mode="date" value="{{date}}" disabled="{{!ready || !selected}}" bindchange="onDate">
+        <view class="date-picker">{{date}}  ▾</view>
+      </picker>
+      <button class="text-button" bindtap="onRetry" disabled="{{loading}}">刷新时段</button>
+    </view>
+
+    <view wx:if="{{loading}}" class="notice" aria-live="polite">正在查询最新安排…</view>
+    <view wx:elif="{{error}}" class="error">
+      <view>{{error}}</view>
+      <button class="secondary" bindtap="onRetry">重新查询</button>
+    </view>
+    <view wx:elif="{{ready && !selected}}" class="notice">暂未发布可查询的医生和服务。</view>
+    <view wx:elif="{{ready}}" class="schedule-results">
+      <view wx:if="{{slots.length}}" class="availability">{{availableCount}} 个可约时段</view>
+      <view wx:if="{{!slots.length}}" class="notice">当天暂无安排，可更换日期或医生。</view>
+      <view wx:elif="{{!availableCount}}" class="notice">当天暂无可约时段，可查看不可约原因或选择其他日期。</view>
+      <view wx:for="{{groups}}" wx:for-item="group" wx:key="name" class="time-group">
+        <view class="period">{{group.name}}</view>
+        <view class="time-grid">
+          <button wx:for="{{group.entries}}" wx:key="key" class="time-slot {{!item.available ? 'unavailable' : ''}} {{selectedSlot && item.key === selectedSlot.key ? 'chosen' : ''}}" disabled="{{!bookingEnabled || !item.available}}" data-key="{{item.key}}" bindtap="onSelectSlot" aria-label="{{item.range}} {{item.label}}">
+            <text>{{item.range}}</text><text class="slot-status">{{selectedSlot && item.key === selectedSlot.key ? '已选择' : item.label}}</text>
+          </button>
+        </view>
+      </view>
+      <button wx:if="{{slots.length > availableCount}}" class="secondary unavailable-toggle" bindtap="onToggleUnavailable">{{showUnavailable ? '收起不可约时段' : '查看 ' + (slots.length - availableCount) + ' 个不可约时段'}}</button>
+      <view wx:if="{{slots.length}}" class="note">北京时间{{queriedAt ? ' · ' + queriedAt + ' 更新' : ''}}</view>
+    </view>
+  </view>
+
+  <view class="footer">{{bookingEnabled ? '课程演示，请使用合成资料。' : '本页提供排班查询，办理预约请联系诊所。'}}</view>
+  <button wx:if="{{bookingEnabled}}" class="text-button recovery-link" bindtap="onRecovery">核实提交结果</button>
+
+  <view wx:if="{{selectedSlot}}" class="booking-dock">
+    <view class="dock-summary"><text class="dock-time">{{selectedSlot.range}}</text><text class="caption">{{date}} · {{selected.doctorName}}</text></view>
+    <button class="primary" bindtap="onContinue">下一步</button>
+  </view>
+</view>

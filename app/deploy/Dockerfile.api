@@ -1,0 +1,22 @@
+# Candidate only: not yet built or run in Docker.
+FROM node:24-bookworm-slim AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/admin/package.json apps/admin/package.json
+RUN npm ci
+COPY apps/api apps/api
+RUN npm run build --workspace @adc/api && npm prune --omit=dev
+
+FROM node:24-bookworm-slim
+WORKDIR /app
+ENV NODE_ENV=production API_HOST=0.0.0.0 API_PORT=3100 ADC_FILE_ROOT=/data/private-files
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/apps/api/dist ./apps/api/dist
+COPY deploy ./deploy
+COPY scripts/config.mjs scripts/migrate.mjs ./scripts/
+COPY database/migrations ./database/migrations
+RUN mkdir -p /data/private-files && chown -R node:node /data
+USER node
+EXPOSE 3100
+CMD ["node","deploy/start.mjs"]

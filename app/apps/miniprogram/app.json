@@ -1,0 +1,25 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/booking/index",
+    "pages/appointments/index",
+    "pages/recovery/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "ADC 牙科",
+    "navigationBarBackgroundColor": "#f8faf9",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f8faf9"
+  },
+  "tabBar": {
+    "color": "#4d6566",
+    "selectedColor": "#195967",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
+    "list": [
+      { "pagePath": "pages/index/index", "text": "预约看牙" },
+      { "pagePath": "pages/appointments/index", "text": "我的预约" }
+    ]
+  },
+  "sitemapLocation": "sitemap.json"
+}

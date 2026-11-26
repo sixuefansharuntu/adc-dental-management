@@ -1,0 +1,6 @@
+import assert from'node:assert/strict';import test from'node:test';
+import{imageHistoryQuery,imageHistoryItem}from'../apps/api/src/image-history-domain';
+import{FollowupQueueCursor}from'../apps/api/src/followup-queue-domain';
+test('影像原版默认25、严格条件和页数',()=>{assert.deepEqual(imageHistoryQuery({}),{imageId:null,limit:25,cursor:null});for(const q of[{limit:'0'},{limit:'51'},{limit:['1','2']},{imageId:[]},{cursor:''},{unknown:'x'},{limit:'1e1'}])assert.throws(()=>imageHistoryQuery(q));assert.equal(imageHistoryQuery({limit:'50'}).limit,50);});
+test('影像原版白名单不带当前归属、电话或文件存储位置',()=>{const r=imageHistoryItem({version_no:'3',byte_size:'200',description:'原说明',visit_id:'old-visit',file_id:'old-file',storage_key:'private',phone:'secret',current_visit_id:'new-visit'});assert.equal(r.version,3);assert.equal(r.visitId,'old-visit');assert.equal(r.fileId,'old-file');for(const s of['private','secret','new-visit'])assert.equal(JSON.stringify(r).includes(s),false);});
+test('独立影像游标密钥不能跨服务或伪造',()=>{const c=new FollowupQueueCursor(),other=new FollowupQueueCursor(),x={asOf:new Date().toISOString(),expires:Date.now()+60000},token=c.encode(x);assert.deepEqual(c.decode(token),x);assert.throws(()=>other.decode(token));assert.throws(()=>c.decode(token+'x'));assert.throws(()=>c.decode(c.encode({...x,expires:Date.now()-1})));});

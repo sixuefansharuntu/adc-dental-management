@@ -1,0 +1,5 @@
+import test from'node:test';import assert from'node:assert/strict';import{fixed,decimal,lineCents,totalAmount,quarterStart}from'../apps/api/src/clinical-domain';
+test('数量与金额只接受明示精度，不接受浮点数、负数、科学计数或多余小数',()=>{for(const x of [1,-1,'-1','1e2','01.00','0.00001',''])assert.throws(()=>fixed(x));assert.throws(()=>fixed('0',4,true));assert.equal(decimal(fixed('0.1'),4),'0.1000');});
+test('逐行四舍五入到分再相加，不使用浮点乘法',()=>{assert.equal(totalAmount([{quantity:'1',unitPrice:'0.1'},{quantity:'1',unitPrice:'0.2'}]),'0.30');assert.equal(lineCents('1','0.005'),1n);assert.equal(totalAmount([{quantity:'1',unitPrice:'0.005'},{quantity:'1',unitPrice:'0.005'}]),'0.02');assert.equal(totalAmount([{quantity:'0.125',unitPrice:'100.0000'}]),'12.50');});
+test('金额边界与总额溢出拒绝，不因运算丢分',()=>{assert.equal(totalAmount([{quantity:'1',unitPrice:'99999999999999.9999'}]),'100000000000000.00');assert.throws(()=>totalAmount([{quantity:'99999999999999',unitPrice:'99999999999999'}]));});
+test('归季依据实际到账瞬间和上海时区，跨UTC边界正确',()=>{assert.equal(quarterStart('2026-09-30T15:59:59Z'),'2026-07-01T00:00:00+08:00');assert.equal(quarterStart('2026-09-30T16:00:00Z'),'2026-10-01T00:00:00+08:00');});

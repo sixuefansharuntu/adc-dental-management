@@ -1,0 +1,40 @@
+.home-nav { display: flex; align-items: center; justify-content: space-between; min-height: 88rpx; margin-bottom: 18rpx; }
+.brand { color: #174852; font-size: 34rpx; font-weight: 700; }
+.welcome { position: relative; overflow: hidden; min-height: 272rpx; border-radius: 28rpx; background: #f9efce; }
+.welcome-copy { box-sizing: border-box; width: 60%; padding: 30rpx 18rpx 28rpx 26rpx; }
+.welcome-copy .subtitle { line-height: 1.35; }
+.welcome-photo { position: absolute; top: 0; right: 0; width: 40%; height: 100%; border-radius: 90rpx 0 0 90rpx; background: #d9e7e8; }
+.welcome-action { width: fit-content; min-height: 82rpx; margin-top: 20rpx; padding-inline: 20rpx; font-size: 26rpx; border-radius: 100rpx; }
+.change-notice .text-button { padding-left: 0; }
+.home-section { margin-top: 34rpx; }
+.filters { padding: 0 24rpx; margin-bottom: 0; }
+.choice-row { display: block; }
+.choice-text { display: flex; min-height: 88rpx; align-items: center; justify-content: space-between; gap: 18rpx; }
+.choice-text text:last-child { min-width: 0; text-align: right; overflow-wrap: anywhere; }
+.choice-text .caption { flex: none; }
+.address { margin: -8rpx 0 14rpx; color: #4d6566; font-size: 24rpx; text-align: right; }
+.doctor-field { padding: 18rpx 0; border-top: 1rpx solid #e1e9e7; border-bottom: 1rpx solid #e1e9e7; }
+.doctor-grid, .time-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12rpx; margin-top: 10rpx; }
+.doctor-option, .time-slot { box-sizing: border-box; min-width: 0; min-height: 94rpx; padding: 12rpx; border: 1rpx solid #d9e5e4; border-radius: 16rpx; color: #174852; background: #f8faf9; font-size: 29rpx; }
+.doctor-option text, .time-slot text { display: block; }
+.doctor-specialty, .slot-status { font-size: 24rpx; color: #4d6566; }
+.doctor-field .text-button { min-height: 76rpx; padding: 0; font-size: 25rpx; }
+.section-heading, .schedule-tools { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; }
+.days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 7rpx; margin-top: 18rpx; }
+.day { display: flex; align-items: center; flex-direction: column; justify-content: center; min-width: 0; min-height: 112rpx; border-radius: 14rpx; background: #edf5f5; color: #35595b; font-size: 23rpx; }
+.day-number { font-size: 34rpx; font-weight: 650; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.day.chosen { background: #174852; color: #fff; }
+.date-picker { display: flex; align-items: center; min-height: 88rpx; font-size: 28rpx; color: #195967; font-weight: 600; }
+.availability, .period { color: #35595b; font-size: 28rpx; font-weight: 600; }
+.time-group { margin-top: 18rpx; }
+.time-slot { font-variant-numeric: tabular-nums; }
+.doctor-option.chosen, .time-slot.chosen { border-color: #59868c; background: #e6f2f3; font-weight: 650; }
+.time-slot.unavailable, .time-slot[disabled] { color: #536463; background: #f0f3f2; }
+.unavailable-toggle { width: 100%; margin-top: 18rpx; }
+.recovery-link { padding: 0; font-size: 25rpx; }
+.with-dock { padding-bottom: calc(154rpx + env(safe-area-inset-bottom)); }
+.booking-dock { box-sizing: border-box; position: fixed; bottom: 0; left: 0; right: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 16rpx; padding: 18rpx 30rpx; padding-bottom: calc(18rpx + env(safe-area-inset-bottom)); border-top: 1rpx solid #d9e5e4; background: #fff; }
+.dock-summary { min-width: 0; }
+.dock-summary text { display: block; }
+.dock-time { font-weight: 650; font-variant-numeric: tabular-nums; }
+.booking-dock .primary { flex: none; min-width: 178rpx; }

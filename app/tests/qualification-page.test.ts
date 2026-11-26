@@ -1,0 +1,3 @@
+import test from'node:test';import assert from'node:assert/strict';import{qualificationPageQuery as query,qualificationPageBound as bound}from'../apps/api/src/qualification-page-domain';
+test('证书目录与原版分页严格单值条件，默认20最大50',()=>{assert.deepEqual(query({}),{limit:20,cursor:null});assert.equal(query({limit:'50',cursor:'signed'}).limit,50);for(const q of[{limit:['20','20']},{limit:'0'},{limit:'51'},{limit:'1.5'},{limit:null},{cursor:[]},{cursor:''},{cursor:'x'.repeat(3001)},{afterId:'old'},{beforeVersion:'1'}])assert.throws(()=>query(q));});
+test('证书完整来源5MiB边界明确拒绝超限',()=>{bound('x'.repeat(5*1024*1024-2));assert.throws(()=>bound('x'.repeat(5*1024*1024-1)));});

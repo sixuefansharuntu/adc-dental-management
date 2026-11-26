@@ -1,0 +1,8 @@
+.booking-summary { background: #edf5f5; }
+.booking-summary .detail-time { margin-top: 10rpx; }
+.result { padding-top: 32rpx; text-align: center; }
+.result-mark {
+  display: flex; align-items: center; justify-content: center; width: 100rpx; height: 100rpx;
+  margin: 0 auto 26rpx; border-radius: 50%; background: #e6f2f3; color: #195967; font-size: 54rpx;
+}
+.result-details { margin-top: 32rpx; text-align: left; }

@@ -1,0 +1,5 @@
+{
+  "schemaVersion": 1,
+  "clinic": {"name": "请填写正式诊所名称", "address": "请填写正式诊所地址"},
+  "administrator": {"name": "请填写管理员姓名", "loginName": "admin.initial"}
+}

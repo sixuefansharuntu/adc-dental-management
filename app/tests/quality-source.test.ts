@@ -1,0 +1,4 @@
+import test from'node:test';import assert from'node:assert/strict';import{qualitySourceQuery}from'../apps/api/src/quality-source-domain';
+const q={clinicId:'AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA',year:'2026',quarter:'4',kind:'record'};
+test('资料来源查选严格单值、类别、期间与有界分页',()=>{const p=qualitySourceQuery(q);assert.equal(p.clinicId,q.clinicId.toLowerCase());assert.equal(p.limit,20);assert.equal(p.term,'');assert.equal(p.kind,'record');for(const extra of[{kind:['record']},{kind:'visit'},{year:['2026']},{quarter:'0'},{limit:'51'},{limit:['20']},{cursor:['x']},{term:['a']},{term:'a'.repeat(101)},{other:'x'}])assert.throws(()=>qualitySourceQuery({...q,...extra}));});
+test('来源编号线索作字面文本传递，不接受对象或宽松页数',()=>{assert.equal(qualitySourceQuery({...q,term:' AB_% ',limit:'50'}).term,'ab_%');for(const extra of[{term:{}},{limit:'20x'},{clinicId:'bad'},{year:'2026x'}])assert.throws(()=>qualitySourceQuery({...q,...extra}));});

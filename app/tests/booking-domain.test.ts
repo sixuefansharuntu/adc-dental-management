@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { peakOccupancy,overlaps,beforeCutoff,bookingInput,contactInput,instantInput } from '../apps/api/src/booking-domain';
+import { credentialHash,credentialMatches } from '../apps/api/src/auth.service';
+const at=(s:string)=>new Date('2026-10-26T'+s+':00+08:00');
+test('容量是同一瞬间的峰值，不将相邻预约误算为同时占用',()=>{const intervals=[{startsAt:at('09:00'),endsAt:at('09:30')},{startsAt:at('09:30'),endsAt:at('10:00')}];assert.equal(peakOccupancy(+at('09:00'),+at('10:00'),intervals),1);assert.equal(overlaps(intervals[0]!,intervals[1]!),false);});
+test('部分重叠和容纳区间计算峰值',()=>{assert.equal(peakOccupancy(+at('09:00'),+at('10:00'),[{startsAt:at('08:30'),endsAt:at('09:40')},{startsAt:at('09:30'),endsAt:at('10:30')}]),2);});
+test('自助截止严格早于，恰好与之后均拒绝',()=>{const cutoff=at('08:00');assert.equal(beforeCutoff(new Date(+cutoff-1),cutoff),true);assert.equal(beforeCutoff(cutoff,cutoff),false);assert.equal(beforeCutoff(new Date(+cutoff+1),cutoff),false);});
+test('预约请求拒绝未支持的主体覆盖和无效联系方式',()=>{assert.throws(()=>bookingInput({booking_subject_id:'other'}));assert.throws(()=>contactInput('not-a-phone'));assert.equal(contactInput('13800000001'),'13800000001');});
+test('凭据使用随机盐摘要，正确口令通过且错误拒绝',async()=>{const a=await credentialHash('synthetic-only');const b=await credentialHash('synthetic-only');assert.notEqual(a,b);assert.equal(await credentialMatches('synthetic-only',a),true);assert.equal(await credentialMatches('wrong',a),false);});
+test('预约时刻拒绝日历自动溢出和24点归一化',()=>{assert.throws(()=>instantInput('2026-02-30T09:00:00+08:00'));assert.throws(()=>instantInput('2026-10-26T24:00:00+08:00'));assert.equal(instantInput('2026-10-26T09:00:00+08:00'),'2026-10-26T01:00:00.000Z');});

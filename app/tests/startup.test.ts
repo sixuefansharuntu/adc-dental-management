@@ -1,0 +1,21 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,writeFile,readFile,access,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {createServer} from 'node:net';
+import {loadConfig} from '../scripts/config.mjs';
+import {localRuntime,compareMigrations,portsAvailable,prepareDevelopment} from '../scripts/startup.mjs';
+import {initializationTarget} from '../scripts/initialize.mjs';
+const e={PGHOST:'127.0.0.1',PGPORT:'54329',PGUSER:'user',PGPASSWORD:'test-only',PGDATABASE:'adc_dev',API_HOST:'127.0.0.1',API_PORT:'3100',ADMIN_ORIGIN:'http://127.0.0.1:5173'};
+async function folder(fn:(p:string)=>Promise<void>){const p=await mkdtemp(join(tmpdir(),'adc-startup-'));try{await fn(p);}finally{await rm(p,{recursive:true,force:true});}}
+test('缺配置时只读加载失败，不建立目录或凭据',async()=>folder(async p=>{await assert.rejects(loadConfig(p),/首次使用/);await assert.rejects(access(join(p,'.env')));await assert.rejects(access(join(p,'.runtime')));}));
+test('既有不完整配置保持逐字节不变，环境仅覆盖已存在的配置项',async()=>folder(async p=>{const content='PGDATABASE=adc_dev\nPGPASSWORD=original-test-only\n';await writeFile(join(p,'.env'),content);const x=await loadConfig(p,{overrides:{PGDATABASE:'adc_test',PGPASSWORD:'override-test-only',UNRELATED:'ignored'}});assert.equal(x.PGDATABASE,'adc_test');assert.equal(x.PGPASSWORD,'override-test-only');assert.ok(!('UNRELATED'in x));assert.equal(await readFile(join(p,'.env'),'utf8'),content);await assert.rejects(access(join(p,'.runtime')));}));
+test('只有明确初始化才生成本机配置，再次加载保留原凭据',async()=>folder(async p=>{await writeFile(join(p,'.env.example'),'PGDATABASE=adc_dev\nPGPASSWORD=generated-by-local-launcher\n');const x=await loadConfig(p,{initialize:true,overrides:{}}),bytes=await readFile(join(p,'.env'));assert.notEqual(x.PGPASSWORD,'generated-by-local-launcher');assert.ok(x.ADC_MANAGER_EAST_PASSWORD);const y=await loadConfig(p,{initialize:true,overrides:{}});assert.equal(y.PGPASSWORD,x.PGPASSWORD);assert.deepEqual(await readFile(join(p,'.env')),bytes);}));
+test('迁移缺失、旧文件变化和未知后续版本分别阻止启动',()=>{const expected=[{name:'001.sql',sha256:'a'}];assert.throws(()=>compareMigrations([],expected),/缺少迁移/);assert.throws(()=>compareMigrations([{name:'001.sql',sha256:'b'}],expected),/摘要不符/);assert.throws(()=>compareMigrations([...expected,{name:'002.sql',sha256:'b'}],expected),/未知/);assert.doesNotThrow(()=>compareMigrations(expected,expected));});
+test('本机启动拒绝外部地址和不匹配端口，不接受不完整数据库配置',()=>{for(const bad of [{PGHOST:'server'},{API_HOST:'0.0.0.0'},{API_PORT:'3101'},{ADMIN_ORIGIN:'https://example.com'},{PGPASSWORD:''},{PGPORT:'NaN'}])assert.throws(()=>localRuntime({...e,...bad}));assert.equal(localRuntime(e).webPort,5173);});
+test('占用端口保持原服务运行，不另挑端口或停止它',async()=>{const server=createServer();await new Promise<void>(r=>server.listen(0,'127.0.0.1',r));const port=(server.address()as any).port;try{await assert.rejects(portsAvailable([port]),/已占用/);assert.equal(server.listening,true);}finally{await new Promise<void>(r=>server.close(()=>r()));}await portsAvailable([port]);});
+test('日常准备只请求恢复既有库和只读核对；纯检查不恢复数据库',async()=>{const calls:string[]=[];const result=await prepareDevelopment(e,{checkPorts:false,startDatabase:async(options:any)=>{assert.equal(options.initialize,false);calls.push('existing');},ready:async()=>{calls.push('read');return{migrations:18};}});assert.deepEqual(calls,['existing','read']);assert.equal(result.migrations,18);calls.length=0;await prepareDevelopment(e,{checkPorts:false,ready:async()=>{calls.push('read');return{};}});assert.deepEqual(calls,['read']);});
+test('首次初始化只接受具名本机目标，拒绝远程和任意现存业务库',()=>{assert.doesNotThrow(()=>initializationTarget(e));assert.doesNotThrow(()=>initializationTarget({...e,PGDATABASE:'adc_initialization_test_123'}));for(const PGDATABASE of ['production','adc_dev_copy','adc_dentist_test_123','adc_dev;drop'])assert.throws(()=>initializationTarget({...e,PGDATABASE}));assert.throws(()=>initializationTarget({...e,PGHOST:'remote'}));});
+
+test('隔离初始化凭据说明放在专用测试目录，不覆盖开发账号说明',async()=>{const{seedReportPath}=await import('../scripts/config.mjs');assert.match(seedReportPath({...e,PGDATABASE:'adc_initialization_test_123'},true),/adc_initialization_test_123$/);assert.throws(()=>seedReportPath(e,true),/隔离/);assert.ok(!seedReportPath(e,false).endsWith('adc_dev'));});

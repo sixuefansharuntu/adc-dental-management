@@ -1,0 +1,3 @@
+import test from'node:test';import assert from'node:assert/strict';import{clinicHistoryQuery,clinicHistoryBound}from'../apps/api/src/clinic-history-domain';
+test('诊所历史严格类别、单值、页数及签名，不接受旧版本游标',()=>{assert.equal(clinicHistoryQuery({kind:'profile'}).limit,50);assert.equal(clinicHistoryQuery({kind:'rule',limit:'20'}).limit,20);for(const q of[{kind:['profile']},{kind:'other'},{limit:'0'},{limit:'51'},{limit:'1.5'},{beforeVersion:'1'},{unknown:'x'},{cursor:['x']},{cursor:''}])assert.throws(()=>clinicHistoryQuery({kind:'profile',...q}));});
+test('完整历史超过5MiB明确拒绝，不返回部分冒称完整',()=>{clinicHistoryBound([]);assert.throws(()=>clinicHistoryBound('x'.repeat(5*1024*1024)));});
