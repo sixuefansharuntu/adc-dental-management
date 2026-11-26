@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import {ref,onBeforeUnmount} from 'vue';
 import {X,LockKeyhole} from '@lucide/vue';
-const props=defineProps<{registrationAllowed:boolean;courseDemo:boolean;api:(path:string,body?:any,signal?:AbortSignal)=>Promise<any>}>();
+import DemoAccountPicker, { type DemoAccount } from './DemoAccountPicker.vue';
+const props=defineProps<{registrationAllowed:boolean;courseDemo:boolean;demoAccounts?:DemoAccount[];api:(path:string,body?:any,signal?:AbortSignal)=>Promise<any>}>();
 const emit=defineEmits<{close:[];authenticated:[actor:any]}>();
 const mode=ref<'login'|'register'>('login'),loginName=ref(''),password=ref(''),confirmation=ref(''),name=ref(''),contact=ref(''),syntheticOnly=ref(false),busy=ref(false),error=ref(''),notice=ref(''),unknown=ref(false);
+const demoRole=ref('');
 let alive=true,pending:any=null,controller:AbortController|null=null;
 onBeforeUnmount(()=>{alive=false;controller?.abort();password.value='';confirmation.value='';pending=null;});
-function changeMode(next:'login'|'register'){if(busy.value||next==='register'&&!props.registrationAllowed)return;mode.value=next;password.value='';confirmation.value='';pending=null;unknown.value=false;error.value='';notice.value='';}
+function changeMode(next:'login'|'register'){if(busy.value||next==='register'&&!props.registrationAllowed)return;mode.value=next;demoRole.value='';password.value='';confirmation.value='';pending=null;unknown.value=false;error.value='';notice.value='';}
 async function submit(){
  if(busy.value)return;error.value='';notice.value='';
  if(mode.value==='register'&&!props.registrationAllowed){error.value='当前环境未开放注册，请返回登录。';return;}
@@ -21,7 +23,10 @@ async function submit(){
    const result=await props.api('/patient/register',pending,controller.signal);if(!alive)return;
    loginName.value=result.loginName;password.value='';confirmation.value='';pending=null;unknown.value=false;mode.value='login';notice.value='注册成功。请使用刚设置的账号和密码登录；预约联系电话尚未验证。';
   }else{
-   const actor=await props.api('/patient/session',{loginName:loginName.value,password:password.value},controller.signal);if(!alive)return;password.value='';emit('authenticated',actor);
+   const actor=demoRole.value
+    ? await props.api('/demo/session',{role:demoRole.value},controller.signal)
+    : await props.api('/patient/session',{loginName:loginName.value,password:password.value},controller.signal);
+   if(!alive)return;password.value='';emit('authenticated',actor);
   }
  }catch(e:any){
   if(!alive)return;
@@ -40,8 +45,11 @@ async function submit(){
   <p>{{mode==='register'?'建立自己的预约账号，注册后即可登录预约。':'登录后可查看、改约或取消本人的预约。'}}</p>
   <div v-if="courseDemo" class="b-help">课程演示仅使用合成资料，联系电话尚未验证；注册不会关联或开放诊所既有病历。</div>
   <div v-if="error" class="b-alert error" role="alert">{{error}}</div><div v-if="notice" class="b-alert success" role="status">{{notice}}</div>
-  <label>患者账号<input v-model="loginName" :disabled="busy||unknown" autocomplete="username" required :maxlength="mode==='register'?32:100" :pattern="mode==='register'?'[a-zA-Z][a-zA-Z0-9_]{3,31}':undefined" placeholder="注册账号为4—32位字母、数字或下划线"/></label>
-  <label>密码<input v-model="password" :disabled="busy||unknown" type="password" :autocomplete="mode==='register'?'new-password':'current-password'" required :minlength="mode==='register'?8:undefined" :maxlength="mode==='register'?128:200"/></label>
+  <DemoAccountPicker v-if="mode==='login' && demoAccounts?.length" v-model="demoRole" :accounts="demoAccounts" label="患者账号" :busy="busy" @update:model-value="password='';error=''"/>
+  <template v-if="mode==='register'||!demoRole">
+   <label>患者账号<input v-model="loginName" :disabled="busy||unknown" autocomplete="username" required :maxlength="mode==='register'?32:100" :pattern="mode==='register'?'[a-zA-Z][a-zA-Z0-9_]{3,31}':undefined" placeholder="注册账号为4—32位字母、数字或下划线"/></label>
+   <label>密码<input v-model="password" :disabled="busy||unknown" type="password" :autocomplete="mode==='register'?'new-password':'current-password'" required :minlength="mode==='register'?8:undefined" :maxlength="mode==='register'?128:200"/></label>
+  </template>
   <template v-if="mode==='register'">
    <div class="b-help">密码至少8位，包含字母和数字。</div>
    <label>确认密码<input v-model="confirmation" :disabled="busy||unknown" type="password" autocomplete="new-password" required minlength="8" maxlength="128"/></label>

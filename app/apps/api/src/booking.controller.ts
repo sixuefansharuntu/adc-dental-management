@@ -10,7 +10,10 @@ import { dateInput,uuidInput } from './domain';
 @Controller('api/v1')
 export class BookingController {
  constructor(@Inject(AuthService)private auth:AuthService,@Inject(BookingService)private bookings:BookingService){}
- @Get('catalogue')async catalogue(){return{...await this.bookings.catalogue(),experience:this.auth.experience(),patientRegistrationEnabled:this.auth.patientRegistrationEnabled()};}
+ @Get('catalogue')async catalogue(){return{...await this.bookings.catalogue(),experience:this.auth.experience(),patientRegistrationEnabled:this.auth.patientRegistrationEnabled(),teacherDemoLoginEnabled:this.auth.courseLoginEnabled(),teacherDemoLoginPublic:this.auth.publicCourseLogin()};}
+ @Get('demo/options') demoOptions(@Req()req:Request,@Res({passthrough:true})res:Response){res.setHeader('Cache-Control','no-store');return this.auth.demoLoginOptions(req);}
+ @Post('demo/access') demoAccess(@Req()req:Request,@Res({passthrough:true})res:Response,@Body()body:unknown){return this.auth.openDemoLogin(req,res,body);}
+ @Post('demo/session') demoSession(@Req()req:Request,@Res({passthrough:true})res:Response,@Body()body:unknown){return this.auth.demoLogin(req,res,body);}
  @Post('patient/register')register(@Req()req:Request,@Res({passthrough:true})res:Response,@Body()body:unknown){return this.auth.registerPatient(req,res,body);}
  @Post('patient/password')changePassword(@Req()req:Request,@Res({passthrough:true})res:Response,@Body()body:unknown){return this.auth.changePatientPassword(req,res,body);}
  @Get('availability') availability(@Query('date') date:unknown,@Query('doctorId') doctor:unknown,@Query('clinicId') clinic:unknown,@Query('serviceVersionId') service:unknown){return this.bookings.availability(dateInput(date),doctor?uuidInput(doctor):undefined,clinic?uuidInput(clinic):undefined,service?uuidInput(service):undefined);}

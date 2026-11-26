@@ -11,6 +11,7 @@ import{credentialMatches}from'./credentials';
 export{credentialHash,credentialMatches}from'./credentials';
 import{CoursePatientRegistration}from'./course-registration';
 import{PatientPasswordChange}from'./patient-password';
+import {CourseLoginAccess,courseLoginRoles} from './course-login';
 export interface PatientActor {subjectId:string;patientId:string|null;name:string;contact:string;identityId:string}
 export interface StaffActor {accountId:string;employeeId:string;name:string}
 @Injectable()
@@ -18,7 +19,8 @@ export class AuthService {
  private demo:CourseDemoGate;
  private registration:CoursePatientRegistration;
  private passwords:PatientPasswordChange;
- constructor(@Inject(DatabaseService) readonly db:DatabaseService){this.demo=new CourseDemoGate(db.pool);this.registration=new CoursePatientRegistration(db.pool,this.demo);this.passwords=new PatientPasswordChange(db.pool,this.demo);}
+ private courseLogin:CourseLoginAccess;
+ constructor(@Inject(DatabaseService) readonly db:DatabaseService){this.demo=new CourseDemoGate(db.pool);this.registration=new CoursePatientRegistration(db.pool,this.demo);this.passwords=new PatientPasswordChange(db.pool,this.demo);this.courseLogin=new CourseLoginAccess(this.demo.enabled);}
  async assertExperience(){await this.demo.assertEnvironment();}
  experience(){return this.demo.enabled?'teacher-demo':'standard';}
  patientRegistrationEnabled(){return this.demo.registrationEnabled;}
@@ -29,29 +31,73 @@ export class AuthService {
  private cookieName(kind:'patient'|'staff'){return(this.demo.enabled?'adc_course_':'adc_')+kind;}
  private cookie(req:Request,kind:'patient'|'staff'){return (req.headers.cookie||'').split(';').map(s=>s.trim()).find(s=>s.startsWith(this.cookieName(kind)+'='))?.split('=')[1]||'';}
  private digest(token:string){return createHash('sha256').update(token).digest('hex');}
+ courseLoginEnabled(){return this.courseLogin.enabled;}
+ publicCourseLogin(){return this.courseLogin.publicEnabled;}
+ demoLoginOptions(req:Request){return {items:this.courseLogin.options(req)};}
+ async openDemoLogin(req:Request,res:Response,value:unknown){
+  this.origin(req);
+  const {invite}=objectInput(value,['invite']);
+  return this.loginAttempt('course-invite',req,res,()=>this.courseLogin.open(invite,res,()=>this.demo.assertEnvironment()));
+ }
+ async demoLogin(req:Request,res:Response,value:unknown){
+  this.origin(req);
+  const expires=this.courseLogin.expires(req);
+  if(!expires)throw new ForbiddenException('演示授权已失效，请重新打开老师专用链接。');
+  const {role}=objectInput(value,['role']);
+  const chosen=courseLoginRoles.find(option=>option.id===role);
+  if(!chosen)throw new BadRequestException('请选择可用的演示账号。');
+  return this.loginAttempt(chosen.kind,req,res,async()=>{
+   await this.demo.assertEnvironment();
+   const row=chosen.kind==='patient'
+    ? (await this.db.pool.query(`SELECT i.identity_id AS id,i.credential_verifier,i.login_name,i.booking_subject_id,s.verified_identity_key,s.patient_id
+        FROM adc_auth.local_identity i JOIN adc.patient_booking_subject s USING(booking_subject_id)
+        WHERE i.identity_id=$1 AND i.login_name=$2 AND i.enabled=true`,[this.demo.manifest?.identities.find(i=>i.loginName===chosen.loginName)?.identityId,chosen.loginName])).rows[0]
+    : (await this.db.pool.query(`SELECT account_id AS id,credential_verifier FROM adc.staff_account
+        WHERE account_id=$1 AND employee_id=$2 AND login_name=$3 AND activation_arrangement='enabled' AND disabled_at IS NULL`,[chosen.accountId,chosen.employeeId,chosen.loginName])).rows[0];
+   if(!row||chosen.kind==='patient'&&!await this.demo.allowsIdentity({identityId:row.id,subjectId:row.booking_subject_id,loginName:row.login_name,verifier:row.credential_verifier,key:row.verified_identity_key,patientId:row.patient_id})){
+    throw new UnauthorizedException('该演示账号当前不可用。');
+   }
+   const duration=Math.min(45*60_000,expires-Date.now());
+   if(duration<=0)throw new ForbiddenException('演示授权已失效，请重新打开老师专用链接。');
+   return this.issueSession(chosen.kind,req,res,row.id,row.credential_verifier,duration,chosen.kind==='staff'?chosen.employeeId:undefined);
+  });
+ }
  async login(kind:'patient'|'staff',req:Request,res:Response,value:unknown){
   this.origin(req);const b=objectInput(value,['loginName','password']);const rawLogin=textInput(b.loginName,'登录名',100),login=kind==='patient'?rawLogin.toLowerCase():rawLogin;
   if(typeof b.password!=='string'||!b.password.length||b.password.length>200||/[\u0000-\u001f]/.test(b.password))throw new BadRequestException('请填写有效的密码。');
   const password=b.password;
   if(kind==='patient'&&!this.demo.enabled&&(process.env.ADC_LOCAL_IDENTITY_ENABLED!=='true'||process.env.NODE_ENV==='production'))throw new ForbiddenException('本地身份适配只用于本机开发；微信身份入口尚待配置。');
-  const key=`${kind}:${canonicalIp(req.ip||req.socket?.remoteAddress||'')}`,ticket=this.loginThrottle.acquire(key);
-  if(!ticket.allowed){res.setHeader('Retry-After',String(ticket.retryAfter));throw new HttpException('尝试过多，请稍后再试。',HttpStatus.TOO_MANY_REQUESTS);}
-  let failed=true;try{
+  return this.loginAttempt(kind,req,res,async()=>{
   if(kind==='patient')await this.demo.assertEnvironment();
   const {rows}=await this.db.pool.query(kind==='patient'?'SELECT i.identity_id AS id,i.credential_verifier,i.login_name,i.booking_subject_id,s.verified_identity_key,s.patient_id FROM adc_auth.local_identity i JOIN adc.patient_booking_subject s USING(booking_subject_id) WHERE i.login_name=$1 AND i.enabled=true':"SELECT account_id AS id,credential_verifier FROM adc.staff_account WHERE login_name=$1 AND activation_arrangement='enabled' AND disabled_at IS NULL",[login]);
   if(kind==='patient'&&this.demo.enabled&&rows[0]&&!await this.demo.allowsIdentity({identityId:rows[0].id,subjectId:rows[0].booking_subject_id,loginName:rows[0].login_name,verifier:rows[0].credential_verifier,key:rows[0].verified_identity_key,patientId:rows[0].patient_id??null}))rows.splice(0);
   // Unknown accounts still perform the same password work to avoid an account-existence timing shortcut.
   const verifier=rows[0]?.credential_verifier||'scrypt:00000000000000000000000000000000:'+ '0'.repeat(128);
   if(!await credentialMatches(password,verifier)||!rows[0])throw new UnauthorizedException('账号或密码不正确。');
+  return this.issueSession(kind,req,res,rows[0].id,verifier);
+  });
+ }
+ private async loginAttempt<T>(kind:string,req:Request,res:Response,work:()=>Promise<T>){
+  const key=`${kind}:${canonicalIp(req.ip||req.socket?.remoteAddress||'')}`,ticket=this.loginThrottle.acquire(key);
+  if(!ticket.allowed){res.setHeader('Retry-After',String(ticket.retryAfter));throw new HttpException('尝试过多，请稍后再试。',HttpStatus.TOO_MANY_REQUESTS);}
+  let failed=true;try{const result=await work();failed=false;return result;}finally{ticket.finish(failed);}
+ }
+ private async issueSession(kind:'patient'|'staff',req:Request,res:Response,id:string,verifier:string,duration=2*60*60_000,employeeId?:string){
   const token=randomBytes(32).toString('hex');
   await this.db.pool.query('DELETE FROM adc_auth.session WHERE expires_at<=clock_timestamp()');
-  if(kind==='patient'){
-   const saved=await this.db.pool.query("INSERT INTO adc_auth.session(token_hash,identity_id,expires_at) SELECT $1,identity_id,clock_timestamp()+interval '2 hours' FROM adc_auth.local_identity WHERE identity_id=$2 AND credential_verifier=$3 AND enabled=true FOR SHARE",[this.digest(token),rows[0].id,verifier]);
-   if(!saved.rowCount)throw new UnauthorizedException('账号状态已变化，请重新登录。');
-  }else await this.db.pool.query("INSERT INTO adc_auth.session(token_hash,account_id,expires_at) VALUES($1,$2,clock_timestamp()+interval '2 hours')",[this.digest(token),rows[0].id]);
-  res.cookie(this.cookieName(kind),token,{httpOnly:true,sameSite:'strict',secure:process.env.NODE_ENV==='production',path:'/api/v1',maxAge:2*60*60_000});
-  const actor=await (kind==='patient'?this.patient(req,token):this.staff(req,token));failed=false;return actor;
-  }finally{ticket.finish(failed);}
+  const args=[this.digest(token),id,verifier,duration];
+  const saved=kind==='patient'
+   ? await this.db.pool.query(`INSERT INTO adc_auth.session(token_hash,identity_id,expires_at)
+      SELECT $1,identity_id,clock_timestamp()+$4::int*interval '1 millisecond' FROM adc_auth.local_identity
+      WHERE identity_id=$2 AND credential_verifier=$3 AND enabled=true FOR SHARE`,args)
+   : await this.db.pool.query(`INSERT INTO adc_auth.session(token_hash,account_id,expires_at)
+      SELECT $1,account_id,clock_timestamp()+$4::int*interval '1 millisecond' FROM adc.staff_account
+      WHERE account_id=$2 AND credential_verifier=$3 AND activation_arrangement='enabled' AND disabled_at IS NULL
+      AND ($5::uuid IS NULL OR employee_id=$5) FOR SHARE`,[...args,employeeId??null]);
+  if(!saved.rowCount)throw new UnauthorizedException('账号状态已变化，请重新登录。');
+  const actor=await (kind==='patient'?this.patient(req,token):this.staff(req,token));
+  res.cookie(this.cookieName(kind),token,{httpOnly:true,sameSite:'strict',secure:process.env.NODE_ENV==='production',path:'/api/v1',maxAge:duration});
+  return actor;
  }
  async patient(req:Request,override?:string):Promise<PatientActor>{
   if(!this.demo.enabled&&(process.env.ADC_LOCAL_IDENTITY_ENABLED!=='true'||process.env.NODE_ENV==='production'))throw new UnauthorizedException('本机患者身份适配未启用。');
