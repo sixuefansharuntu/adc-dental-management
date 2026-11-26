@@ -10,6 +10,10 @@
 
 在患者端或员工端打开登录框，点「账号」栏选择演示身份，再提交登录。患者端可选「演示患者」，员工端可选「东城前台」或「东城医生」。三个身份均可从上方链接直接进入，无需输入密码。
 
+**手机扫码打开患者预约页**
+
+<img src="docs/adc-patient-qr.png" width="185" height="185" alt="ADC 患者预约页二维码">
+
 若GitHub无法在线预览大PDF，可点击文件的下载按钮，在本地PDF阅读器中查看；也可使用 **Code → Download ZIP** 下载整个仓库。
 
 ![全系统ERD总览](diagrams/ADC-ERD-overview.png)
