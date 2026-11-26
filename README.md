@@ -39,6 +39,12 @@
 
 <img src="docs/adc-patient-qr.png" width="185" height="185" alt="ADC 患者预约页二维码">
 
+**微信小程序体验版**
+
+请使用已添加为体验成员的微信账号扫码。当前体验码在 2026 年 12 月 4 日前有效。
+
+<img src="docs/adc-miniprogram-trial-qr.png" width="393" alt="ADC 预约演示微信小程序体验版二维码">
+
 若GitHub无法在线预览大PDF，可点击文件的下载按钮，在本地PDF阅读器中查看；也可使用 **Code → Download ZIP** 下载整个仓库。
 
 ![全系统ERD总览](diagrams/ADC-ERD-overview.png)
