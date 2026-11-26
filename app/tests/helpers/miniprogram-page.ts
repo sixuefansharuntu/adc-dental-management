@@ -8,6 +8,15 @@ export function simulateMiniCloud(defaultStatus = 200) {
   calls.push({name,options,reply(data,statusCode=defaultStatus){success({result:{status:statusCode,data}});},fail(){fail();}});
  } } };
 }
+export function bridgePublicMiniCloud(platform:{request(options:any):unknown},base:string) {
+ Object.assign(platform,{cloud:{callFunction({name,data,success,fail}:any) {
+  if(name!=='adcApi'||data.method!=='GET'||!['/catalogue','/availability','/availability/next'].includes(data.path)){
+   fail({errMsg:'Unexpected cloud call in public query test'});return;
+  }
+  platform.request({url:base+data.path,method:'GET',data:data.data,
+   success:(reply:any)=>success({result:{status:reply.statusCode,data:reply.data}}),fail});
+ }}});
+}
 // Register the actual page entry point with a replaceable wx network boundary.
 export function miniprogramPage(platform:any, base='http://127.0.0.1/api/v1',options:{page?:'index'|'booking'|'appointments'|'recovery'|'account';globalData?:any}={}) {
  const entry=fileURLToPath(new URL('../../apps/miniprogram/pages/'+(options.page||'index')+'/index.js',import.meta.url));

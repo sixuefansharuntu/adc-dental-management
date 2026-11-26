@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';import pg from 'pg';import {randomBytes,randomUUID,createHash} from 'node:crypto';
 import {writeFile,rm} from 'node:fs/promises';import {resolve,join,sep} from 'node:path';import {createRequire} from 'node:module';
 import {config,pgOptions,root} from './config.mjs';import {migrate} from './migrate.mjs';import {seedBooking} from './seed-booking.mts';import {fixtureId as id} from './seed.mjs';
-import {miniprogramPage} from '../tests/helpers/miniprogram-page';
+import {bridgePublicMiniCloud,miniprogramPage} from '../tests/helpers/miniprogram-page';
 const require=createRequire(import.meta.url),{createPatientApi}=require('../apps/miniprogram/lib/patient-api.js'),{createReceiptStore}=require('../apps/miniprogram/lib/receipt-store.js');
 const env=await config(),originalEnv={...process.env},name='adc_miniprogram_retirement_test_'+Date.now(),folder=resolve(root,'.runtime',name);
 assert.match(name,/^adc_miniprogram_retirement_test_\d+$/);assert.ok(folder.startsWith(resolve(root,'.runtime')+sep));
@@ -36,8 +36,9 @@ try{
    if(isBook&&dropAfter){dropAfter=false;attempts.push({path:url.pathname,simulatedLoss:'after-server-reply',status:r.status});options.fail();return;}
    options.success({statusCode:r.status,data});
   }).catch(()=>options.fail());return{abort(){controller.abort();}};
- },getRandomValues(o:any){o.success({randomValues:Uint8Array.from(randomBytes(16)).buffer});},navigateTo(o:any){navigation=o.url;},stopPullDownRefresh(){}};
+ },getRandomValues(o:any){o.success({randomValues:Uint8Array.from(randomBytes(16)).buffer});},navigateTo(o:any){navigation=o.url;},switchTab(o:any){navigation=o.url;},stopPullDownRefresh(){}};
  const storage=new Map<string,string>();Object.assign(platform,{getStorageSync:(k:string)=>storage.get(k)||'',setStorageSync:(k:string,v:string)=>storage.set(k,v),removeStorageSync:(k:string)=>storage.delete(k)});const journal=createReceiptStore(platform,()=>base);const state={pending:null as any},api=createPatientApi(platform,()=>base,{journal}),globals={localBookingEnabled:true,miniBookingState:state,miniBookingApi:api,miniReceiptStore:journal};
+ bridgePublicMiniCloud(platform,base);
  const index=miniprogramPage(platform,base,{globalData:globals});const pick=(value:any)=>({detail:{value}}),input=(field:string,value:string)=>({currentTarget:{dataset:{field}},detail:{value}}),confirm={detail:{value:['yes']}};
  const openPage=()=>{const route=new URL('http://local'+navigation),options=Object.fromEntries(route.searchParams);const p=miniprogramPage(platform,base,{page:'booking',globalData:globals});p.onLoad(options);p.onShow();return p;};
  let page:any,firstId:string,firstBody:any;
@@ -46,7 +47,7 @@ try{
   const slot=index.data.slots.find((s:any)=>s.available);assert.ok(slot);index.onBook({currentTarget:{dataset:{key:slot.key}}});assert.ok(navigation.startsWith('/pages/booking/index?'));assert.equal(navigation.includes('name='),false);page=openPage();assert.equal(page.data.phase,'needs_login');
  });
  await check('实际预约页验证合成患者，独立token哈希入库，不发Cookie且不把token写data',async()=>{
-  page.onInput(input('loginName','alice'));page.onInput(input('password',env.ADC_PATIENT_A_PASSWORD!));await page.onLogin();assert.equal(page.data.patient.subjectId,id('subject-alice'));assert.equal(page.data.credentials.password,'');assert.equal(JSON.stringify(page.data).includes(tokens.get('alice')!),false);
+  await page.onLogin({detail:{value:{loginName:'alice',password:env.ADC_PATIENT_A_PASSWORD!}}});assert.equal(page.data.patient.subjectId,id('subject-alice'));assert.equal(Object.hasOwn(page.data,'credentials'),false);assert.equal(JSON.stringify(page.data).includes(tokens.get('alice')!),false);
   const token=tokens.get('alice')!,hash=createHash('sha256').update('miniprogram-local:'+token).digest('hex');assert.equal((await db.pool.query('SELECT identity_id FROM adc_auth.session WHERE token_hash=$1',[hash])).rows[0].identity_id,id('identity-alice'));
   assert.equal((await call('/patient/session',undefined,{Authorization:'Bearer '+token})).status,401);
  });
@@ -66,7 +67,7 @@ try{
    const oldToken=tokens.get('alice'),freshJournal=createReceiptStore(platform,()=>base),freshApi=createPatientApi(platform,()=>base,{journal:freshJournal});
    assert.deepEqual(Object.keys(freshJournal.read()).sort(),['appointmentId','kind','requestId','schemaVersion','subjectId']);
    const fresh=miniprogramPage(platform,base,{page:'recovery',globalData:{localBookingEnabled:true,miniBookingApi:freshApi,miniReceiptStore:freshJournal}});fresh.onLoad();assert.equal(fresh.data.receipt,null);
-   fresh.input(input('loginName','alice'));fresh.input(input('password',env.ADC_PATIENT_A_PASSWORD!));await fresh.login();assert.equal(fresh.data.verified,true);const posts=uiRequests.filter(r=>r.path.endsWith('/miniprogram/appointments')).length;
+   await fresh.login({detail:{value:{loginName:'alice',password:env.ADC_PATIENT_A_PASSWORD!}}});assert.equal(fresh.data.verified,true);const posts=uiRequests.filter(r=>r.path.endsWith('/miniprogram/appointments')).length;
    await check('原结果已完成但凭证删除失败，保原后再次GET核实而不重发',async()=>{
     const remove=(platform as any).removeStorageSync;let failed=false;(platform as any).removeStorageSync=(key:string)=>{if(!failed){failed=true;throw Error('isolated cleanup failure');}remove(key);};
     await fresh.recover();assert.equal(fresh.data.result,null);assert.ok(fresh.data.receipt);assert.ok(journal.read());assert.equal(uiRequests.filter(r=>r.path.endsWith('/miniprogram/appointments')).length,posts);
@@ -84,7 +85,7 @@ try{
   assert.equal((await call('/miniprogram/appointments',{...firstBody,requestId:randomUUID(),name:'合成乙',contact:'13800000002'},h)).status,409);
  });
  await check('返回公开页重查已满状态，另选相邻时段不沿用原确认',async()=>{
-  await page.onLogout();page.onUnload();await index.refresh();assert.equal(index.data.slots[0].label,'已约满');const next=index.data.slots.find((s:any)=>s.available);index.onBook({currentTarget:{dataset:{key:next.key}}});page=openPage();page.onInput(input('loginName','alice'));page.onInput(input('password',env.ADC_PATIENT_A_PASSWORD!));await page.onLogin();page.onInput(input('intention','隔离第二相邻时段'));await page.onQuote();assert.equal(page.data.confirmed,false);assert.equal(page.data.phase,'quoted');
+  await page.onLogout();page.onUnload();await index.refresh();assert.equal(index.data.slots[0].label,'已约满');const next=index.data.slots.find((s:any)=>s.available);index.onBook({currentTarget:{dataset:{key:next.key}}});page=openPage();await page.onLogin({detail:{value:{loginName:'alice',password:env.ADC_PATIENT_A_PASSWORD!}}});page.onInput(input('intention','隔离第二相邻时段'));await page.onQuote();assert.equal(page.data.confirmed,false);assert.equal(page.data.phase,'quoted');
  });
  await check('模拟发送前断网，核实未见后明确确认，复查再用原编号正文保存一次',async()=>{
   page.onConfirm(confirm);dropBefore=true;await page.onSubmit();assert.equal(page.data.phase,'unknown');const original=structuredClone(state.pending.body);assert.equal((await db.pool.query('SELECT count(*)::int n FROM adc.appointment')).rows[0].n,1);
@@ -106,7 +107,7 @@ try{
   mine.reschedule({currentTarget:{dataset:{id:firstId}}});assert.equal(state.reschedule.id,firstId);assert.equal(state.reschedule.version,1);
   await index.onLoad();await index.onDate(pick(process.env.BOOKING_DEMO_DATE));await index.onClinic(pick(index.data.clinics.findIndex((c:any)=>c.clinicId===id('clinic-east'))));await index.onDoctor(pick(index.data.doctors.findIndex((d:any)=>d.doctorId===id('booking-lin'))));
   const slot=index.data.slots.find((r:any)=>r.available);index.onBook({currentTarget:{dataset:{key:slot.key}}});page=openPage();assert.equal(page.data.changing,true);
-  page.onInput(input('loginName','alice'));page.onInput(input('password',env.ADC_PATIENT_A_PASSWORD!));await page.onLogin();await page.onQuote();page.onConfirm(confirm);await page.onSubmit();assert.equal(page.data.result.id,firstId);assert.equal(page.data.result.version,2);
+  await page.onLogin({detail:{value:{loginName:'alice',password:env.ADC_PATIENT_A_PASSWORD!}}});await page.onQuote();page.onConfirm(confirm);await page.onSubmit();assert.equal(page.data.result.id,firstId);assert.equal(page.data.result.version,2);
   assert.equal((await call('/miniprogram/logout',{}, {Authorization:'Bearer '+listToken})).status,201);
   await mine.restore();assert.equal(mine.data.rows.find((r:any)=>r.id===firstId).version,2);
   mine.chooseCancel({currentTarget:{dataset:{id:firstId}}});mine.input(input('reason','合成患者变更安排'));mine.confirm(confirm);dropAfter=true;await mine.cancel();assert.equal(mine.data.unknown,true);
@@ -131,7 +132,7 @@ try{
   for(const kind of ['book','reschedule','cancel']){
    const requestId=randomUUID(),target=kind==='book'?null:active.appointment_id;retiredKeys.push(requestId);
    journal.save({schemaVersion:1,subjectId:id('subject-alice'),kind,requestId,appointmentId:target});
-   const recovery=miniprogramPage(platform,base,{page:'recovery',globalData:globals});recovery.onLoad();recovery.input(input('loginName','alice'));recovery.input(input('password',env.ADC_PATIENT_A_PASSWORD!));await recovery.login();assert.equal(recovery.data.verified,true);
+   const recovery=miniprogramPage(platform,base,{page:'recovery',globalData:globals});recovery.onLoad();await recovery.login({detail:{value:{loginName:'alice',password:env.ADC_PATIENT_A_PASSWORD!}}});assert.equal(recovery.data.verified,true);
    const posts=uiRequests.length;await recovery.retire();assert.equal(uiRequests.length,posts);await recovery.recover();assert.equal(recovery.data.canRetire,true);
    recovery.confirmRetire(confirm);await recovery.retire();assert.equal(recovery.data.receipt,null);assert.equal(journal.read(),null);
    const header={Authorization:'Bearer '+tokens.get('alice')},body={kind,...(target?{appointmentId:target}:{}),confirmed:true};

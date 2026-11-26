@@ -28,7 +28,7 @@ function form(value) {
 }
 function createBookingPage({ api, state, enabled, newRequestId, takePreview = () => null }) {
   return {
-    data: { changing: false, enabled: false, patient: null, credentials: { loginName: '', password: '' }, form: { name: '', contact: '', intention: '' },
+    data: { changing: false, enabled: false, patient: null, passwordReset: 0, form: { name: '', contact: '', intention: '' },
       phase: 'needs_login', preview: null, summary: null, quote: null, confirmed: false, retryConfirmed: false, retryAllowed: false, busy: false, error: '', result: null },
     onLoad(options) {
       this._visible = true; this._dead = false; this._epoch = 0;
@@ -44,7 +44,7 @@ function createBookingPage({ api, state, enabled, newRequestId, takePreview = ()
       }
       catch (e) { this.setData({ phase: 'invalid', error: e.message }); }
     },
-    onHide() { this._visible = false; this._epoch++; this.setData({ busy: false, quote: null, confirmed: false, credentials: { loginName: this.data.credentials.loginName, password: '' } }); },
+    onHide() { this._visible = false; this._epoch++; this.setData({ busy: false, quote: null, confirmed: false, passwordReset: this.data.passwordReset + 1 }); },
     onUnload() { this._dead = true; this._visible = false; this._epoch++; },
     onShow() {
       if (this._visible === false && !this._dead) {
@@ -59,15 +59,14 @@ function createBookingPage({ api, state, enabled, newRequestId, takePreview = ()
       if (!this._visible || this._dead || this.data.busy) return;
       const field = e.currentTarget.dataset.field, value = e.detail.value;
       if (typeof value !== 'string') return;
-      if (['loginName', 'password'].includes(field)) this.setData({ credentials: { ...this.data.credentials, [field]: value }, error: '' });
-      else if (['name', 'contact', 'intention'].includes(field) && !state.pending && this.data.phase !== 'saved') this.setData({ form: { ...this.data.form, [field]: value }, quote: null, confirmed: false, phase: this.data.patient ? 'ready' : 'needs_login' });
+      if (['name', 'contact', 'intention'].includes(field) && !state.pending && this.data.phase !== 'saved') this.setData({ form: { ...this.data.form, [field]: value }, quote: null, confirmed: false, phase: this.data.patient ? 'ready' : 'needs_login' });
     },
-    async onLogin() {
+    async onLogin(e) {
       if (!this.data.enabled || !this._selection || this.data.busy || !this._visible || this._dead) return;
-      const token = ++this._epoch, credentials = { ...this.data.credentials };
-      this.setData({ busy: true, error: '', credentials: { loginName: credentials.loginName, password: '' }, quote: null, confirmed: false, patient: null });
+      const token = ++this._epoch;
+      this.setData({ busy: true, error: '', passwordReset: this.data.passwordReset + 1, quote: null, confirmed: false, patient: null });
       try {
-        const patient = await api.login(credentials);
+        const patient = await api.login(e?.detail?.value);
         if (!this._current(token)) return;
         if (state.pending && state.pending.subjectId !== patient.subjectId) { await api.logout(); throw new Error('原请求尚未核实，请使用原合成患者账号。'); }
         this.setData({ patient, form: state.pending ? { ...state.pending.form } : state.reschedule && state.reschedule.subjectId === patient.subjectId ? { ...state.reschedule.form } : { name: patient.name, contact: patient.contact, intention: '' }, phase: state.pending ? 'unknown' : 'ready' });

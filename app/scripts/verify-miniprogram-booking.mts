@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';import pg from 'pg';import {randomBytes,randomUUID,createHash} from 'node:crypto';
 import {writeFile,rm} from 'node:fs/promises';import {resolve,join,sep} from 'node:path';import {createRequire} from 'node:module';
 import {config,pgOptions,root} from './config.mjs';import {migrate} from './migrate.mjs';import {seedBooking} from './seed-booking.mts';import {fixtureId as id} from './seed.mjs';
-import {miniprogramPage} from '../tests/helpers/miniprogram-page';
+import {bridgePublicMiniCloud,miniprogramPage} from '../tests/helpers/miniprogram-page';
 const require=createRequire(import.meta.url),{createPatientApi}=require('../apps/miniprogram/lib/patient-api.js');
 const env=await config(),originalEnv={...process.env},name='adc_miniprogram_booking_test_'+Date.now(),folder=resolve(root,'.runtime',name);
 assert.match(name,/^adc_miniprogram_booking_test_\d+$/);assert.ok(folder.startsWith(resolve(root,'.runtime')+sep));
@@ -38,6 +38,7 @@ try{
   }).catch(()=>options.fail());return{abort(){controller.abort();}};
  },getRandomValues(o:any){o.success({randomValues:Uint8Array.from(randomBytes(16)).buffer});},navigateTo(o:any){navigation=o.url;},stopPullDownRefresh(){}};
  const state={pending:null as any},api=createPatientApi(platform,()=>base),globals={localBookingEnabled:true,miniBookingState:state,miniBookingApi:api};
+ bridgePublicMiniCloud(platform,base);
  const index=miniprogramPage(platform,base,{globalData:globals});const pick=(value:any)=>({detail:{value}}),input=(field:string,value:string)=>({currentTarget:{dataset:{field}},detail:{value}}),confirm={detail:{value:['yes']}};
  const openPage=()=>{const route=new URL('http://local'+navigation),options=Object.fromEntries(route.searchParams);const p=miniprogramPage(platform,base,{page:'booking',globalData:globals});p.onLoad(options);p.onShow();return p;};
  let page:any,firstId:string,firstBody:any;
@@ -46,7 +47,7 @@ try{
   const slot=index.data.slots.find((s:any)=>s.available);assert.ok(slot);index.onBook({currentTarget:{dataset:{key:slot.key}}});assert.ok(navigation.startsWith('/pages/booking/index?'));assert.equal(navigation.includes('name='),false);page=openPage();assert.equal(page.data.phase,'needs_login');
  });
  await check('实际预约页验证合成患者，独立token哈希入库，不发Cookie且不把token写data',async()=>{
-  page.onInput(input('loginName','alice'));page.onInput(input('password',env.ADC_PATIENT_A_PASSWORD!));await page.onLogin();assert.equal(page.data.patient.subjectId,id('subject-alice'));assert.equal(page.data.credentials.password,'');assert.equal(JSON.stringify(page.data).includes(tokens.get('alice')!),false);
+  await page.onLogin({detail:{value:{loginName:'alice',password:env.ADC_PATIENT_A_PASSWORD!}}});assert.equal(page.data.patient.subjectId,id('subject-alice'));assert.equal(Object.hasOwn(page.data,'credentials'),false);assert.equal(JSON.stringify(page.data).includes(tokens.get('alice')!),false);
   const token=tokens.get('alice')!,hash=createHash('sha256').update('miniprogram-local:'+token).digest('hex');assert.equal((await db.pool.query('SELECT identity_id FROM adc_auth.session WHERE token_hash=$1',[hash])).rows[0].identity_id,id('identity-alice'));
   assert.equal((await call('/patient/session',undefined,{Authorization:'Bearer '+token})).status,401);
  });
@@ -73,7 +74,7 @@ try{
   assert.equal((await call('/miniprogram/appointments',{...firstBody,requestId:randomUUID(),name:'合成乙',contact:'13800000002'},h)).status,409);
  });
  await check('返回公开页重查已满状态，另选相邻时段不沿用原确认',async()=>{
-  await page.onLogout();page.onUnload();await index.refresh();assert.equal(index.data.slots[0].label,'已约满');const next=index.data.slots.find((s:any)=>s.available);index.onBook({currentTarget:{dataset:{key:next.key}}});page=openPage();page.onInput(input('loginName','alice'));page.onInput(input('password',env.ADC_PATIENT_A_PASSWORD!));await page.onLogin();page.onInput(input('intention','隔离第二相邻时段'));await page.onQuote();assert.equal(page.data.confirmed,false);assert.equal(page.data.phase,'quoted');
+  await page.onLogout();page.onUnload();await index.refresh();assert.equal(index.data.slots[0].label,'已约满');const next=index.data.slots.find((s:any)=>s.available);index.onBook({currentTarget:{dataset:{key:next.key}}});page=openPage();await page.onLogin({detail:{value:{loginName:'alice',password:env.ADC_PATIENT_A_PASSWORD!}}});page.onInput(input('intention','隔离第二相邻时段'));await page.onQuote();assert.equal(page.data.confirmed,false);assert.equal(page.data.phase,'quoted');
  });
  await check('模拟发送前断网，核实未见后明确确认，复查再用原编号正文保存一次',async()=>{
   page.onConfirm(confirm);dropBefore=true;await page.onSubmit();assert.equal(page.data.phase,'unknown');const original=structuredClone(state.pending.body);assert.equal((await db.pool.query('SELECT count(*)::int n FROM adc.appointment')).rows[0].n,1);

@@ -38,16 +38,16 @@
         <view wx:if="{{quote ? quote.address : preview.address}}" class="note">{{quote ? quote.address : preview.address}}</view>
       </view>
 
-      <view wx:if="{{!patient}}" class="profile">
+      <form wx:if="{{!patient}}" class="profile" bindsubmit="onLogin">
         <view class="section-title">患者登录</view>
         <label class="form-label" for="patient-name">患者账号</label>
-        <input id="patient-name" class="entry" value="{{credentials.loginName}}" maxlength="100" data-field="loginName" bindinput="onInput" disabled="{{busy}}"/>
+        <input id="patient-name" class="entry credential-entry" name="loginName" type="text" maxlength="100" disabled="{{busy}}"/>
         <label class="form-label" for="patient-password">密码</label>
-        <input id="patient-password" class="entry" password="{{true}}" value="{{credentials.password}}" maxlength="200" data-field="password" bindinput="onInput" disabled="{{busy}}"/>
+        <input wx:for="{{[passwordReset]}}" wx:key="*this" id="patient-password" class="entry credential-entry" name="password" type="text" password="{{true}}" maxlength="200" disabled="{{busy}}"/>
         <view wx:if="{{error}}" class="error" aria-live="polite">{{error}}</view>
-        <view class="action-stack"><button class="primary" bindtap="onLogin" disabled="{{busy}}" loading="{{busy}}">登录</button></view>
+        <view class="action-stack"><button class="primary" form-type="submit" disabled="{{busy}}" loading="{{busy}}">登录</button></view>
         <navigator wx:if="{{!busy}}" class="text-button account-link" url="/pages/account/index?mode=register">新用户？注册患者账号</navigator>
-      </view>
+      </form>
       <view wx:elif="{{phase === 'unknown'}}" class="profile">
         <view class="section-title">提交结果待确认</view>
         <view class="body">请先核实这笔预约的结果。</view>

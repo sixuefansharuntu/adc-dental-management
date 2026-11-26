@@ -4,15 +4,15 @@
     <view class="subtitle">查询之前提交的预约、改约或取消。</view>
   </view>
   <block wx:if="{{enabled}}">
-    <view wx:if="{{!verified}}" class="profile">
+    <form wx:if="{{!verified}}" class="profile" bindsubmit="login">
       <view class="section-title">登录原患者账号</view>
       <label class="form-label" for="recover-name">患者账号</label>
-      <input id="recover-name" class="entry" data-field="loginName" bindinput="input" value="{{loginName}}" disabled="{{busy}}"/>
+      <input id="recover-name" class="entry credential-entry" name="loginName" type="text" maxlength="100" disabled="{{busy}}"/>
       <label class="form-label" for="recover-password">密码</label>
-      <input id="recover-password" class="entry" password="{{true}}" data-field="password" bindinput="input" value="{{password}}" disabled="{{busy}}"/>
+      <input wx:for="{{[passwordReset]}}" wx:key="*this" id="recover-password" class="entry credential-entry" name="password" type="text" password="{{true}}" maxlength="200" disabled="{{busy}}"/>
       <view wx:if="{{message}}" class="error" aria-live="polite">{{message}}</view>
-      <view class="action-stack"><button class="primary" bindtap="login" disabled="{{busy}}" loading="{{busy}}">登录</button></view>
-    </view>
+      <view class="action-stack"><button class="primary" form-type="submit" disabled="{{busy}}" loading="{{busy}}">登录</button></view>
+    </form>
     <view wx:if="{{verified && message}}" class="notice" aria-live="polite">{{message}}</view>
     <view wx:if="{{verified && receipt}}" class="profile">
       <button class="primary" bindtap="recover" disabled="{{busy}}" loading="{{busy}}">查询原请求结果</button>

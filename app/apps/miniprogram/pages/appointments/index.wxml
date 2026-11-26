@@ -3,16 +3,16 @@
     <view class="title">我的预约</view>
   </view>
   <view wx:if="{{!enabled}}" class="notice">当前仅开放排班查询。</view>
-  <view wx:elif="{{!patient}}" class="profile">
+  <form wx:elif="{{!patient}}" class="profile" bindsubmit="login">
     <view class="section-title">患者登录</view>
     <label class="form-label" for="mine-name">患者账号</label>
-    <input id="mine-name" class="entry" value="{{loginName}}" data-field="loginName" bindinput="input" disabled="{{busy}}"/>
+    <input id="mine-name" class="entry credential-entry" name="loginName" type="text" maxlength="100" disabled="{{busy}}"/>
     <label class="form-label" for="mine-password">密码</label>
-    <input id="mine-password" class="entry" password="{{true}}" value="{{password}}" data-field="password" bindinput="input" disabled="{{busy}}"/>
+    <input wx:for="{{[passwordReset]}}" wx:key="*this" id="mine-password" class="entry credential-entry" name="password" type="text" password="{{true}}" maxlength="200" disabled="{{busy}}"/>
     <view wx:if="{{error}}" class="error" aria-live="polite">{{error}}</view>
-    <view class="action-stack"><button class="primary" bindtap="login" disabled="{{busy}}" loading="{{busy}}">登录</button></view>
+    <view class="action-stack"><button class="primary" form-type="submit" disabled="{{busy}}" loading="{{busy}}">登录</button></view>
     <navigator wx:if="{{!busy}}" class="text-button account-link" url="/pages/account/index?mode=register">新用户？注册患者账号</navigator>
-  </view>
+  </form>
   <block wx:else>
     <view wx:if="{{otherPending}}" class="notice">
       <view>有一笔预约或改约结果待确认。</view>

@@ -10,16 +10,16 @@
     <block wx:if="{{mode === 'register'}}">
       <view class="caption">课程演示仅使用合成资料。预约联系电话尚未验证。</view>
       <label class="form-label" for="account-login">患者账号</label>
-      <input id="account-login" class="entry {{fieldErrors.loginName ? 'invalid' : ''}}" data-field="loginName" value="{{loginName}}" bindinput="input" maxlength="32" focus="{{focusField === 'loginName'}}" disabled="{{busy || unknown}}"/>
+      <input id="account-login" class="entry credential-entry {{fieldErrors.loginName ? 'invalid' : ''}}" type="text" data-field="loginName" value="{{loginName}}" bindinput="input" bindblur="blur" maxlength="32" focus="{{focusField === 'loginName'}}" disabled="{{busy || unknown}}"/>
       <view class="{{fieldErrors.loginName ? 'field-error' : 'caption'}}">{{fieldErrors.loginName || '以英文字母开头，4—32位，可用数字和下划线（_）。'}}</view>
     </block>
-    <block wx:else>
+    <block wx:if="{{mode === 'password'}}">
       <label class="form-label" for="account-old">原密码</label>
-      <input id="account-old" class="entry {{fieldErrors.oldPassword ? 'invalid' : ''}}" password="{{true}}" data-field="oldPassword" value="{{oldPassword}}" bindinput="input" maxlength="200" focus="{{focusField === 'oldPassword'}}" disabled="{{busy}}"/>
+      <input id="account-old" class="entry credential-entry {{fieldErrors.oldPassword ? 'invalid' : ''}}" type="text" password="{{true}}" data-field="oldPassword" value="{{oldPassword}}" bindinput="input" bindblur="blur" maxlength="200" focus="{{focusField === 'oldPassword'}}" disabled="{{busy}}"/>
       <view wx:if="{{fieldErrors.oldPassword}}" class="field-error">{{fieldErrors.oldPassword}}</view>
     </block>
     <label class="form-label" for="account-password">{{mode === 'register' ? '密码' : '新密码'}}</label>
-    <input id="account-password" class="entry {{fieldErrors.password ? 'invalid' : ''}}" password="{{true}}" data-field="password" value="{{password}}" bindinput="input" maxlength="128" focus="{{focusField === 'password'}}" disabled="{{busy || unknown}}"/>
+    <input id="account-password" class="entry credential-entry {{fieldErrors.password ? 'invalid' : ''}}" type="text" password="{{true}}" data-field="password" value="{{password}}" bindinput="input" bindblur="blur" maxlength="128" focus="{{focusField === 'password'}}" disabled="{{busy || unknown}}"/>
     <view class="password-help" aria-live="polite">
       <view wx:if="{{fieldErrors.password}}" class="field-error">{{fieldErrors.password}}</view>
       <view class="password-help-title">密码要求</view>
@@ -29,14 +29,14 @@
       </view>
     </view>
     <label class="form-label" for="account-confirmation">确认密码</label>
-    <input id="account-confirmation" class="entry {{fieldErrors.confirmation || (confirmation && !confirmationMatches) ? 'invalid' : ''}}" password="{{true}}" data-field="confirmation" value="{{confirmation}}" bindinput="input" maxlength="128" focus="{{focusField === 'confirmation'}}" disabled="{{busy || unknown}}"/>
+    <input id="account-confirmation" class="entry credential-entry {{fieldErrors.confirmation || (confirmation && !confirmationMatches) ? 'invalid' : ''}}" type="text" password="{{true}}" data-field="confirmation" value="{{confirmation}}" bindinput="input" bindblur="blur" maxlength="128" focus="{{focusField === 'confirmation'}}" disabled="{{busy || unknown}}"/>
     <view aria-live="polite" class="{{confirmationMatches ? 'rule-met' : confirmationStatus || fieldErrors.confirmation ? 'field-error' : 'caption'}}">{{confirmationStatus || fieldErrors.confirmation || '请再次输入密码。'}}</view>
     <block wx:if="{{mode === 'register'}}">
       <label class="form-label" for="account-name">预约姓名</label>
-      <input id="account-name" class="entry {{fieldErrors.name ? 'invalid' : ''}}" data-field="name" value="{{name}}" bindinput="input" maxlength="40" focus="{{focusField === 'name'}}" disabled="{{busy || unknown}}"/>
+      <input id="account-name" class="entry {{fieldErrors.name ? 'invalid' : ''}}" data-field="name" value="{{name}}" bindinput="input" bindblur="blur" maxlength="40" focus="{{focusField === 'name'}}" disabled="{{busy || unknown}}"/>
       <view wx:if="{{fieldErrors.name}}" class="field-error">{{fieldErrors.name}}</view>
       <label class="form-label" for="account-contact">预约联系电话</label>
-      <input id="account-contact" class="entry {{fieldErrors.contact ? 'invalid' : ''}}" data-field="contact" value="{{contact}}" bindinput="input" maxlength="40" focus="{{focusField === 'contact'}}" disabled="{{busy || unknown}}"/>
+      <input id="account-contact" class="entry {{fieldErrors.contact ? 'invalid' : ''}}" data-field="contact" value="{{contact}}" bindinput="input" bindblur="blur" maxlength="40" focus="{{focusField === 'contact'}}" disabled="{{busy || unknown}}"/>
       <view wx:if="{{fieldErrors.contact}}" class="field-error">{{fieldErrors.contact}}</view>
     </block>
     <checkbox-group wx:if="{{mode === 'register'}}" bindchange="consent">

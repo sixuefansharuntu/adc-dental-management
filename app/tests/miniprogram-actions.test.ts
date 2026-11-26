@@ -3,6 +3,17 @@ import test from 'node:test';import assert from 'node:assert/strict';
 const row={id:'original',version:2,disposition:'active',name:'甲',contact:'13800000001',intention:'咨询',startsAt:'2028-01-01T01:00:00Z',endsAt:'2028-01-01T01:30:00Z',canCancel:true,canReschedule:true};
 const event={currentTarget:{dataset:{id:'original'}}},yes={detail:{value:['yes']}};
 function setup(overrides:any={}){const calls:any[]=[],state:any={pending:null};let route='';const api:any={session:async()=>({subjectId:'a',name:'甲'}),mine:async()=>({items:[row],nextCursor:null}),cancel:async(id:any,b:any)=>{calls.push({id,body:b});return{id,version:3,disposition:'cancelled'};},status:async()=>({state:'not_found'}),...overrides};const definition=createAppointmentsPage({api,state,enabled:()=>true,newRequestId:async()=> 'request-original',navigate:(r:any)=>{route=r;}});const p:any={...definition,data:structuredClone(definition.data),setData(x:any){Object.assign(this.data,x);}};return{p,state,calls,route:()=>route};}
+test('本人预约只从提交事件读取密码，提交和离开都重置原生输入框',async()=>{
+ const submitted:unknown[]=[];
+ const {p}=setup({session:async()=>{throw Object.assign(Error('未登录'),{code:'NO_SESSION'});},login:async(body:unknown)=>{submitted.push(body);throw Error('请核对账号密码。');}});
+ await p.onLoad();
+ const body={loginName:'demo_patient',password:'Example123'};
+ assert.equal(p.data.passwordReset,0);
+ await p.login({detail:{value:body}});assert.deepEqual(submitted,[body]);
+ assert.equal(Object.hasOwn(p.data,'password'),false);
+ assert.equal(p.data.passwordReset,1);
+ p.onHide();assert.equal(p.data.passwordReset,2);
+});
 test('本人预约展示完整北京时间并把原编号版本带入改约',async()=>{const{p,state,route}=setup();await p.onLoad();p.reschedule(event);assert.equal(state.reschedule.id,'original');assert.equal(state.reschedule.version,2);assert.equal(state.reschedule.subjectId,'a');assert.equal(route(),'/pages/index/index');assert.match(p.data.rows[0].range,/09:00/);});
 test('取消须先选择、填原因、明确确认，采用原版本',async()=>{const{p,calls}=setup();await p.onLoad();await p.cancel();assert.equal(calls.length,0);p.chooseCancel(event);p.input({currentTarget:{dataset:{field:'reason'}},detail:{value:'协商取消'}});p.confirm(yes);await p.cancel();assert.equal(calls.length,1);assert.deepEqual(calls[0],{id:'original',body:{requestId:'request-original',version:2,reason:'协商取消'}});});
 test('已取消或不允许变更不打开操作',async()=>{const{p,state}=setup({mine:async()=>({items:[{...row,canCancel:false,canReschedule:false}],nextCursor:null})});await p.onLoad();p.chooseCancel(event);p.reschedule(event);assert.equal(p.data.selected,null);assert.equal(state.reschedule,undefined);});

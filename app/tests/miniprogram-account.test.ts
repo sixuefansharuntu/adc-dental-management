@@ -62,4 +62,7 @@ test('注册规则实时逐项更新，修正密码后再次核对确认，提�
  input('password','Abcd1235!');assert.match(page.data.confirmationStatus,/不一致/);
  await page.submit();assert.deepEqual(Object.keys(page.data.fieldErrors),['loginName','confirmation','name','contact','syntheticOnly']);
  assert.equal(page.data.focusField,'loginName');assert.equal(calls.length,1);
+ input('loginName','demo_patient');assert.equal(page.data.focusField,'loginName');
+ page.blur({currentTarget:{dataset:{field:'loginName'}}});assert.equal(page.data.focusField,'');
+ page.onHide();assert.equal(page.data.password,'');
 });

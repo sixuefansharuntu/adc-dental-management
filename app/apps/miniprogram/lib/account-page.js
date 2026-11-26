@@ -40,7 +40,7 @@ function createAccountPage({ api, catalogue, newRequestId }) {
       const value = e.detail.value;
       const fieldErrors = { ...this.data.fieldErrors };
       delete fieldErrors[field];
-      const update = { [field]: value, fieldErrors, error: '', focusField: '' };
+      const update = { [field]: value, fieldErrors, error: '' };
       if (field === 'password' || field === 'confirmation') {
         const password = field === 'password' ? value : this.data.password;
         const confirmation = field === 'confirmation' ? value : this.data.confirmation;
@@ -51,6 +51,9 @@ function createAccountPage({ api, catalogue, newRequestId }) {
         delete fieldErrors.confirmation;
       }
       this.setData(update);
+    },
+    blur(e) {
+      if (this.data.focusField === e.currentTarget.dataset.field) this.setData({ focusField: '' });
     },
     consent(e) {
       if (this.data.busy || this.data.unknown) return;
